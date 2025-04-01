@@ -69,7 +69,7 @@ type Observation struct {
 	Cached string `json:"cached"`
 }
 
-type AirQuData struct {
+type AirQualityData struct {
 	Obs    []Observation `json:"obs"`
 	Status string        `json:"status"`
 	Ver    string        `json:"ver"`
