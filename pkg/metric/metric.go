@@ -180,6 +180,31 @@ func (m *Metric) metricHandler(metricType string, queryType string) (any, error)
 		response = m.MaxTime(metricType)
 	case "min":
 		response = m.MinTime(metricType)
+	case "success_rate":
+		response = m.SuccessRate()
+	case "failure_rate":
+		response = m.FailureRate()
+	case "count":
+		response = m.Count(metricType)
+	case "stddev":
+		response = m.StdDev(metricType)
+	case "variance":
+		response = m.Variance(metricType)
+	case "percentiles":
+		percentiles := []float64{25, 50, 75, 90, 95, 99}
+		response = m.Percentiles(metricType, percentiles)
+	case "all":
+		response = map[string]any{
+			"mean":         m.Mean(metricType),
+			"max":          m.MaxTime(metricType),
+			"min":          m.MinTime(metricType),
+			"success_rate": m.SuccessRate(),
+			"failure_rate": m.FailureRate(),
+			"count":        m.Count(metricType),
+			"stddev":       m.StdDev(metricType),
+			"variance":     m.Variance(metricType),
+			"percentiles":  m.Percentiles(metricType, []float64{25, 50, 75, 90, 95, 99}),
+		}
 	default:
 		return "", fmt.Errorf("invalid query type: %s", queryType)
 	}
