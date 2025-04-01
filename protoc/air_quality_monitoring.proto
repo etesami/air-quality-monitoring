@@ -1,0 +1,21 @@
+syntax = "proto3";
+option go_package = "github.com/etesami/air-quality-monitoring/protoc";
+package air_quality_monitoring;
+
+service AirQualityMonitoring {
+    // A simple RPC to send data to the server
+    // and receive an acknowledgment
+    rpc SendData(Data) returns (Ack);
+}
+
+message Data {
+    string payload = 1;
+    string sent_timestamp = 2;
+}
+
+message Ack {
+    string status = 1;
+    string original_sent_timestamp = 2;
+    string received_timestamp = 3;
+    string ack_sent_timestamp = 4;
+}
