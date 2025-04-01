@@ -99,7 +99,7 @@ func sendToDataIngestionService(client pb.AirQualityMonitoringClient, data map[s
 	defer cancel()
 
 	sentTimestamp := time.Now().UnixMilli()
-	ack, err := client.SendData(ctx, &pb.Data{
+	ack, err := client.SendDataToIngsetion(ctx, &pb.Data{
 		Payload:       string(jsonString),
 		SentTimestamp: strconv.Itoa(int(sentTimestamp)),
 	})

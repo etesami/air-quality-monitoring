@@ -7,46 +7,60 @@ import (
 	"os"
 
 	api "github.com/etesami/air-quality-monitoring/api"
+	metric "github.com/etesami/air-quality-monitoring/pkg/metric"
 	pb "github.com/etesami/air-quality-monitoring/pkg/protoc"
 	svcapi "github.com/etesami/air-quality-monitoring/svc-data-ingestion/api"
 
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 )
 
-// // measureTime is a utility function to measure elapsed time
-// // It returns the current time if start is nil, and the elapsed time if end is nil
-// // If both are nil, it returns the current time and nil for duration
-// func measureTime(start, end *time.Time) (time.Time, *time.Duration) {
-// 	if start == nil {
-// 		return time.Now(), nil
-// 	}
-// 	if end == nil {
-// 		duration := time.Since(*start)
-// 		return time.Time{}, &duration
-// 	}
-// 	// If both start and end are nil, return the current time
-// 	return time.Now(), nil
-// }
-
 func main() {
-	// Initialize the service
-	svcAddress := os.Getenv("SVC_ADD")
-	svcPort := os.Getenv("SVC_PORT")
-	thisSvc := &api.Service{
+	// Target service initialization
+	svcTargetAddress := os.Getenv("SVC_LOCAL_ADD")
+	svcTargetPort := os.Getenv("SVC_LCOAL_PORT")
+	targetSvc := &api.Service{
+		Address: svcTargetAddress,
+		Port:    svcTargetPort,
+	}
+	conn, err := grpc.NewClient(
+		targetSvc.Address+":"+targetSvc.Port,
+		grpc.WithTransportCredentials(insecure.NewCredentials()))
+	if err != nil {
+		log.Fatalf("did not connect to target service: %v", err)
+	}
+	defer conn.Close()
+
+	metricList := &metric.Metric{
+		RttTimes:        make([]float64, 0),
+		ProcessingTimes: make([]float64, 0),
+		SuccessCount:    0,
+		FailureCount:    0,
+	}
+
+	client := pb.NewAirQualityMonitoringClient(conn)
+
+	// Local service initialization
+	svcAddress := os.Getenv("SVC_LOCAL_ADD")
+	svcPort := os.Getenv("SVC_LCOAL_PORT")
+	localSvc := &api.Service{
 		Address: svcAddress,
 		Port:    svcPort,
 	}
 
 	// We listen on all interfaces
-	listener, err := net.Listen("tcp", fmt.Sprintf(":%s", thisSvc.Port))
+	listener, err := net.Listen("tcp", fmt.Sprintf(":%s", localSvc.Port))
 	if err != nil {
 		log.Fatalf("Failed to listen: %v", err)
 	}
 
 	grpcServer := grpc.NewServer()
-	pb.RegisterAirQualityMonitoringServer(grpcServer, &svcapi.Server{})
+	pb.RegisterAirQualityMonitoringServer(grpcServer, &svcapi.Server{
+		Client: &client,
+		Metric: metricList,
+	})
 
-	log.Printf("gRPC server is running on port :%s\n", thisSvc.Port)
+	log.Printf("gRPC server is running on port :%s\n", localSvc.Port)
 	if err := grpcServer.Serve(listener); err != nil {
 		log.Fatalf("Failed to serve: %v", err)
 	}
