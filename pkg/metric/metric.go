@@ -24,6 +24,14 @@ func (m *Metric) AddRttTime(time float64, success bool) {
 	m.RttTimes = append(m.RttTimes, time)
 }
 
+func (m *Metric) Lock() {
+	m.mu.Lock()
+}
+
+func (m *Metric) Unlock() {
+	m.mu.Unlock()
+}
+
 func minSlice(data []float64) float64 {
 	if len(data) == 0 {
 		return 0 // or handle empty slice case appropriately
