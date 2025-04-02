@@ -10,13 +10,6 @@ import (
 )
 
 type Metric struct {
-	// // TODO: change to map[string]float64 to allow for multiple services
-	// RttTimes []float64 `json:"rtt_times"`
-	// // TODO: change to map[string]float64 to allow for multiple services
-	// ProcessingTimes []float64 `json:"processing_times"`
-	// // TODO: change to map[string]int to allow for multiple services
-	// FailureCount int `json:"failure_count"`
-	// SuccessCount int `json:"success_count"`
 	RttTimes        map[string][]float64 `json:"rtt_times"`
 	ProcessingTimes map[string][]float64 `json:"processing_times"`
 	FailureCount    map[string]int       `json:"failure_count"`
@@ -238,7 +231,7 @@ func (m *Metric) ProcessingTimeHandler() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		queryType := r.URL.Query().Get("type")
-		svcName := r.URL.Query().Get("name")
+		svcName := r.URL.Query().Get("service")
 
 		metric := "processing"
 		response, err := m.metricHandler(svcName, metric, queryType)

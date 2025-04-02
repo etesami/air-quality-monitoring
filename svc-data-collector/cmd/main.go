@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"log"
 	"net/http"
 	"os"
@@ -42,9 +43,6 @@ func main() {
 		Address: svcAddress,
 		Port:    svcPort,
 	}
-	if err := svc.ServiceReachable(); err != nil {
-		log.Fatalf("Error checking environment variables: %v", err)
-	}
 
 	for {
 		if err := svc.ServiceReachable(); err == nil {
@@ -63,16 +61,17 @@ func main() {
 	log.Printf("Connected to target service: %s:%s\n", svc.Address, svc.Port)
 
 	metricList := &metric.Metric{
-		RttTimes:        make([]float64, 0),
-		ProcessingTimes: make([]float64, 0),
-		SuccessCount:    0,
-		FailureCount:    0,
+		RttTimes:        make(map[string][]float64),
+		ProcessingTimes: make(map[string][]float64),
+		FailureCount:    make(map[string]int),
+		SuccessCount:    make(map[string]int),
 	}
 
 	client := pb.NewAirQualityMonitoringClient(conn)
+
 	// Call api evey 60 seconds
 	// TODO: Adjust the time
-	ticker := time.NewTicker(5 * time.Second)
+	ticker := time.NewTicker(2 * time.Second)
 	defer ticker.Stop()
 
 	go func() {
@@ -85,8 +84,10 @@ func main() {
 		}
 	}()
 
+	metricPort := os.Getenv("METRIC_PORT")
+	http.HandleFunc("/metrics", metricList.IndexHandler())
 	http.HandleFunc("/metrics/rtt", metricList.RttHandler())
 	http.HandleFunc("/metrics/processing", metricList.ProcessingTimeHandler())
-	log.Println("Starting server on :8089")
-	log.Fatal(http.ListenAndServe(":8089", nil))
+	log.Printf("Starting server on :%s\n", metricPort)
+	log.Fatal(http.ListenAndServe(fmt.Sprintf(":%s", metricPort), nil))
 }
