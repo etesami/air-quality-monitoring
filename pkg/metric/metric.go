@@ -24,18 +24,59 @@ type Metric struct {
 	mu              sync.Mutex
 }
 
-func (m *Metric) AddProcessingTime(s string, time float64, success bool) {
+func (m *Metric) AddProcessingTime(s string, time float64) {
+	m.lock()
+	defer m.unlock()
+	if m.ProcessingTimes == nil {
+		m.ProcessingTimes = make(map[string][]float64)
+	}
+	if _, ok := m.ProcessingTimes[s]; !ok {
+		m.ProcessingTimes[s] = []float64{}
+	}
 	m.ProcessingTimes[s] = append(m.ProcessingTimes[s], time)
 }
-func (m *Metric) AddRttTime(s string, time float64, success bool) {
+
+func (m *Metric) AddRttTime(s string, time float64) {
+	m.lock()
+	defer m.unlock()
+	if m.RttTimes == nil {
+		m.RttTimes = make(map[string][]float64)
+	}
+	if _, ok := m.RttTimes[s]; !ok {
+		m.RttTimes[s] = []float64{}
+	}
 	m.RttTimes[s] = append(m.RttTimes[s], time)
 }
 
-func (m *Metric) Lock() {
+func (m *Metric) Sucess(s string) {
+	m.lock()
+	defer m.unlock()
+	if m.SuccessCount == nil {
+		m.SuccessCount = make(map[string]int)
+	}
+	if _, ok := m.SuccessCount[s]; !ok {
+		m.SuccessCount[s] = 0
+	}
+	m.SuccessCount[s]++
+}
+
+func (m *Metric) Failure(s string) {
+	m.lock()
+	defer m.unlock()
+	if m.FailureCount == nil {
+		m.FailureCount = make(map[string]int)
+	}
+	if _, ok := m.FailureCount[s]; !ok {
+		m.FailureCount[s] = 0
+	}
+	m.FailureCount[s]++
+}
+
+func (m *Metric) lock() {
 	m.mu.Lock()
 }
 
-func (m *Metric) Unlock() {
+func (m *Metric) unlock() {
 	m.mu.Unlock()
 }
 
