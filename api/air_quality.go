@@ -6,43 +6,43 @@ import (
 )
 
 type Attributions struct {
-	URL  string `json:"url"`
-	Name string `json:"name"`
+	URL  string `json:"url,omitempty"`
+	Name string `json:"name,omitempty"`
 	Logo string `json:"logo,omitempty"`
 }
 
 type City struct {
-	Geo      []float64 `json:"geo"`
-	Name     string    `json:"name"`
-	URL      string    `json:"url"`
+	Geo      []float64 `json:"geo,omitempty"`
+	Name     string    `json:"name,omitempty"`
+	URL      string    `json:"url,omitempty"`
 	Location string    `json:"location,omitempty"`
 }
 
 type IAQI struct {
-	H    Measurement `json:"h"`
-	P    Measurement `json:"p"`
-	PM25 Measurement `json:"pm25"`
-	T    Measurement `json:"t"`
-	W    Measurement `json:"w"`
-	WG   Measurement `json:"wg"`
+	H    Measurement `json:"h,omitempty"`
+	P    Measurement `json:"p,omitempty"`
+	PM25 Measurement `json:"pm25,omitempty"`
+	T    Measurement `json:"t,omitempty"`
+	W    Measurement `json:"w,omitempty"`
+	WG   Measurement `json:"wg,omitempty"`
 }
 
 type Measurement struct {
-	V float64 `json:"v"`
+	V float64 `json:"v,omitempty"`
 }
 
 type Time struct {
-	S   string `json:"s"`
-	TZ  string `json:"tz"`
-	V   int64  `json:"v"`
-	ISO string `json:"iso"`
+	S   string `json:"s,omitempty"`
+	TZ  string `json:"tz,omitempty"`
+	V   int64  `json:"v,omitempty"`
+	ISO string `json:"iso,omitempty"`
 }
 
 type ForecastDaily struct {
-	Avg float64 `json:"avg"`
-	Day string  `json:"day"`
-	Max float64 `json:"max"`
-	Min float64 `json:"min"`
+	Avg float64 `json:"avg,omitempty"`
+	Day string  `json:"day,omitempty"`
+	Max float64 `json:"max,omitempty"`
+	Min float64 `json:"min,omitempty"`
 }
 
 type Forecast struct {
@@ -55,29 +55,29 @@ type Forecast struct {
 }
 
 type Msg struct {
-	Aqi          int            `json:"aqi"`
-	Idx          int            `json:"idx"`
-	Attributions []Attributions `json:"attributions"`
-	City         City           `json:"city"`
-	DominentPol  string         `json:"dominentpol"`
-	IAQI         IAQI           `json:"iaqi"`
-	Time         Time           `json:"time"`
-	Forecast     Forecast       `json:"forecast"`
+	Aqi          int            `json:"aqi,omitempty"`
+	Idx          int            `json:"idx,omitempty"`
+	Attributions []Attributions `json:"attributions,omitempty"`
+	City         City           `json:"city,omitempty"`
+	DominentPol  string         `json:"dominentpol,omitempty"`
+	IAQI         IAQI           `json:"iaqi,omitempty"`
+	Time         Time           `json:"time,omitempty"`
+	Forecast     Forecast       `json:"forecast,omitempty"`
 }
 
 type Observation struct {
-	Msg   Msg `json:"msg"`
+	Msg   Msg `json:"msg,omitempty"`
 	Debug struct {
-		Sync string `json:"sync"`
-	} `json:"debug"`
-	Status string `json:"status"`
-	Cached string `json:"cached"`
+		Sync string `json:"sync,omitempty"`
+	} `json:"debug,omitempty"`
+	Status string `json:"status,omitempty"`
+	Cached string `json:"cached,omitempty"`
 }
 
 type AirQualityData struct {
 	Obs    []Observation `json:"obs"`
 	Status string        `json:"status"`
-	Ver    string        `json:"ver"`
+	Ver    string        `json:"ver,omitempty"`
 }
 
 func (obs *Observation) ToMap() (map[string]any, error) {
