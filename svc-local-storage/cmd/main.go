@@ -9,7 +9,7 @@ import (
 
 	api "github.com/etesami/air-quality-monitoring/api"
 	pb "github.com/etesami/air-quality-monitoring/pkg/protoc"
-	svcapi "github.com/etesami/air-quality-monitoring/svc-local-storage/api"
+	internal "github.com/etesami/air-quality-monitoring/svc-local-storage/internal"
 	_ "github.com/mattn/go-sqlite3"
 	"google.golang.org/grpc"
 )
@@ -36,8 +36,8 @@ func createTables(db *sql.DB) error {
 
 func main() {
 
-	svcAddress := os.Getenv("SVC_ADD")
-	svcPort := os.Getenv("SVC_PORT")
+	svcAddress := os.Getenv("SVC_LOCAL_ADD")
+	svcPort := os.Getenv("SVC_LOCAL_PORT")
 	thisSvc := &api.Service{
 		Address: svcAddress,
 		Port:    svcPort,
@@ -59,7 +59,7 @@ func main() {
 		log.Fatal(err)
 	}
 	grpcServer := grpc.NewServer()
-	pb.RegisterAirQualityMonitoringServer(grpcServer, &svcapi.Server{db: db})
+	pb.RegisterAirQualityMonitoringServer(grpcServer, &internal.Server{Db: db})
 	log.Printf("gRPC server is running on port :%s\n", thisSvc.Port)
 	if err := grpcServer.Serve(listener); err != nil {
 		log.Fatal(err)
