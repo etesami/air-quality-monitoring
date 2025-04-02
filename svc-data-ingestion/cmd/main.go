@@ -17,8 +17,8 @@ import (
 
 func main() {
 	// Target service initialization
-	svcTargetAddress := os.Getenv("SVC_LOCAL_ADD")
-	svcTargetPort := os.Getenv("SVC_LCOAL_PORT")
+	svcTargetAddress := os.Getenv("SVC_TARGET_ADD")
+	svcTargetPort := os.Getenv("SVC_TARGET_PORT")
 	targetSvc := &api.Service{
 		Address: svcTargetAddress,
 		Port:    svcTargetPort,
@@ -30,6 +30,7 @@ func main() {
 		log.Fatalf("did not connect to target service: %v", err)
 	}
 	defer conn.Close()
+	log.Printf("Connected to target service: %s:%s\n", targetSvc.Address, targetSvc.Port)
 
 	metricList := &metric.Metric{
 		RttTimes:        make([]float64, 0),
@@ -42,7 +43,7 @@ func main() {
 
 	// Local service initialization
 	svcAddress := os.Getenv("SVC_LOCAL_ADD")
-	svcPort := os.Getenv("SVC_LCOAL_PORT")
+	svcPort := os.Getenv("SVC_LOCAL_PORT")
 	localSvc := &api.Service{
 		Address: svcAddress,
 		Port:    svcPort,
@@ -60,7 +61,7 @@ func main() {
 		Metric: metricList,
 	})
 
-	log.Printf("gRPC server is running on port :%s\n", localSvc.Port)
+	log.Printf("starting gRPC server on port %s:%s\n", localSvc.Address, localSvc.Port)
 	if err := grpcServer.Serve(listener); err != nil {
 		log.Fatalf("Failed to serve: %v", err)
 	}

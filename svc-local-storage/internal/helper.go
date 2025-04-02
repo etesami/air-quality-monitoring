@@ -1,4 +1,4 @@
-package api
+package internal
 
 import (
 	"context"
@@ -15,10 +15,10 @@ import (
 
 type Server struct {
 	pb.UnimplementedAirQualityMonitoringServer
-	db *sql.DB
+	Db *sql.DB
 }
 
-func (s Server) SendData(ctx context.Context, recData *pb.Data) (*pb.Ack, error) {
+func (s Server) SendDataToStorage(ctx context.Context, recData *pb.Data) (*pb.Ack, error) {
 	receivedTime := time.Now()
 	ReceivedTimestamp := receivedTime.UnixMilli()
 	log.Printf("Received at [%s]: [%d]\n", receivedTime.Format("2006-01-02 15:04:05"), len(recData.Payload))
@@ -29,9 +29,10 @@ func (s Server) SendData(ctx context.Context, recData *pb.Data) (*pb.Ack, error)
 			log.Printf("Error unmarshalling JSON: %v", err)
 		}
 		// Insert data into the database
-		if err := insertAirQuData(s.db, *aqData); err != nil {
+		if err := insertAirQuData(s.Db, *aqData); err != nil {
 			log.Printf("Error inserting data into database: %v", err)
 		}
+		log.Printf("Data inserted into database successfully\n")
 	}()
 
 	ack := &pb.Ack{

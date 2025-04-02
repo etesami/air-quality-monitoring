@@ -36,8 +36,8 @@ func main() {
 		Token: token,
 	}
 
-	svcAddress := os.Getenv("SVC_ADD")
-	svcPort := os.Getenv("SVC_PORT")
+	svcAddress := os.Getenv("SVC_TARGET_ADD")
+	svcPort := os.Getenv("SVC_TARGET_PORT")
 	svc := &api.Service{
 		Address: svcAddress,
 		Port:    svcPort,
@@ -60,6 +60,7 @@ func main() {
 		log.Fatalf("did not connect: %v", err)
 	}
 	defer conn.Close()
+	log.Printf("Connected to target service: %s:%s\n", svc.Address, svc.Port)
 
 	metricList := &metric.Metric{
 		RttTimes:        make([]float64, 0),
