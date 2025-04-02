@@ -202,6 +202,37 @@ func (m *Metric) RttHandler() http.HandlerFunc {
 	}
 }
 
+// IndexHandler handles the /metrics endpoint
+// and returns the names of all services and available metrics
+func (m *Metric) IndexHandler() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+
+		services := make([]string, 0, len(m.RttTimes))
+		for service := range m.RttTimes {
+			services = append(services, service)
+		}
+		for service := range m.ProcessingTimes {
+			if _, ok := m.RttTimes[service]; !ok {
+				services = append(services, service)
+			}
+		}
+		sort.Strings(services)
+		metrics := []string{"rtt", "processing"}
+		types := []string{"mean", "max", "min", "success_rate", "failure_rate", "count", "stddev", "variance", "percentiles"}
+		sort.Strings(types)
+
+		w.Header().Set("Content-Type", "application/json")
+		response := map[string]any{
+			"services": services,
+			"metrics":  metrics,
+			"types":    types,
+		}
+		w.WriteHeader(http.StatusOK)
+		json.NewEncoder(w).Encode(response)
+	}
+
+}
+
 // metricsProcessingTimeHandler handles the /metrics/processing endpoint
 func (m *Metric) ProcessingTimeHandler() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
