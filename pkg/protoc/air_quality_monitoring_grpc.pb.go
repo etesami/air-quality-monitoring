@@ -19,8 +19,11 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	AirQualityMonitoring_SendDataToIngsetion_FullMethodName = "/air_quality_monitoring.AirQualityMonitoring/SendDataToIngsetion"
-	AirQualityMonitoring_SendDataToStorage_FullMethodName   = "/air_quality_monitoring.AirQualityMonitoring/SendDataToStorage"
+	AirQualityMonitoring_SendDataToIngsetion_FullMethodName         = "/air_quality_monitoring.AirQualityMonitoring/SendDataToIngsetion"
+	AirQualityMonitoring_SendDataToStorage_FullMethodName           = "/air_quality_monitoring.AirQualityMonitoring/SendDataToStorage"
+	AirQualityMonitoring_ReceiveDataFromLocalStorage_FullMethodName = "/air_quality_monitoring.AirQualityMonitoring/ReceiveDataFromLocalStorage"
+	AirQualityMonitoring_SendToAggregatedStorage_FullMethodName     = "/air_quality_monitoring.AirQualityMonitoring/SendToAggregatedStorage"
+	AirQualityMonitoring_ReceiveAggregatedData_FullMethodName       = "/air_quality_monitoring.AirQualityMonitoring/ReceiveAggregatedData"
 )
 
 // AirQualityMonitoringClient is the client API for AirQualityMonitoring service.
@@ -33,6 +36,12 @@ type AirQualityMonitoringClient interface {
 	// A simple RPC to send data to the storage service
 	// and receive an acknowledgment
 	SendDataToStorage(ctx context.Context, in *Data, opts ...grpc.CallOption) (*Ack, error)
+	// A simple RPC to request data from the local storage
+	ReceiveDataFromLocalStorage(ctx context.Context, in *Data, opts ...grpc.CallOption) (*DataResponse, error)
+	// A simple RPC to send data to the aggregated storage service
+	SendToAggregatedStorage(ctx context.Context, in *Data, opts ...grpc.CallOption) (*Ack, error)
+	// A simple RPC to request data from the aggregated storage
+	ReceiveAggregatedData(ctx context.Context, in *Data, opts ...grpc.CallOption) (*DataResponse, error)
 }
 
 type airQualityMonitoringClient struct {
@@ -63,6 +72,36 @@ func (c *airQualityMonitoringClient) SendDataToStorage(ctx context.Context, in *
 	return out, nil
 }
 
+func (c *airQualityMonitoringClient) ReceiveDataFromLocalStorage(ctx context.Context, in *Data, opts ...grpc.CallOption) (*DataResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(DataResponse)
+	err := c.cc.Invoke(ctx, AirQualityMonitoring_ReceiveDataFromLocalStorage_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *airQualityMonitoringClient) SendToAggregatedStorage(ctx context.Context, in *Data, opts ...grpc.CallOption) (*Ack, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(Ack)
+	err := c.cc.Invoke(ctx, AirQualityMonitoring_SendToAggregatedStorage_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *airQualityMonitoringClient) ReceiveAggregatedData(ctx context.Context, in *Data, opts ...grpc.CallOption) (*DataResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(DataResponse)
+	err := c.cc.Invoke(ctx, AirQualityMonitoring_ReceiveAggregatedData_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // AirQualityMonitoringServer is the server API for AirQualityMonitoring service.
 // All implementations must embed UnimplementedAirQualityMonitoringServer
 // for forward compatibility.
@@ -73,6 +112,12 @@ type AirQualityMonitoringServer interface {
 	// A simple RPC to send data to the storage service
 	// and receive an acknowledgment
 	SendDataToStorage(context.Context, *Data) (*Ack, error)
+	// A simple RPC to request data from the local storage
+	ReceiveDataFromLocalStorage(context.Context, *Data) (*DataResponse, error)
+	// A simple RPC to send data to the aggregated storage service
+	SendToAggregatedStorage(context.Context, *Data) (*Ack, error)
+	// A simple RPC to request data from the aggregated storage
+	ReceiveAggregatedData(context.Context, *Data) (*DataResponse, error)
 	mustEmbedUnimplementedAirQualityMonitoringServer()
 }
 
@@ -88,6 +133,15 @@ func (UnimplementedAirQualityMonitoringServer) SendDataToIngsetion(context.Conte
 }
 func (UnimplementedAirQualityMonitoringServer) SendDataToStorage(context.Context, *Data) (*Ack, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method SendDataToStorage not implemented")
+}
+func (UnimplementedAirQualityMonitoringServer) ReceiveDataFromLocalStorage(context.Context, *Data) (*DataResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ReceiveDataFromLocalStorage not implemented")
+}
+func (UnimplementedAirQualityMonitoringServer) SendToAggregatedStorage(context.Context, *Data) (*Ack, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method SendToAggregatedStorage not implemented")
+}
+func (UnimplementedAirQualityMonitoringServer) ReceiveAggregatedData(context.Context, *Data) (*DataResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ReceiveAggregatedData not implemented")
 }
 func (UnimplementedAirQualityMonitoringServer) mustEmbedUnimplementedAirQualityMonitoringServer() {}
 func (UnimplementedAirQualityMonitoringServer) testEmbeddedByValue()                              {}
@@ -146,6 +200,60 @@ func _AirQualityMonitoring_SendDataToStorage_Handler(srv interface{}, ctx contex
 	return interceptor(ctx, in, info, handler)
 }
 
+func _AirQualityMonitoring_ReceiveDataFromLocalStorage_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(Data)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AirQualityMonitoringServer).ReceiveDataFromLocalStorage(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AirQualityMonitoring_ReceiveDataFromLocalStorage_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AirQualityMonitoringServer).ReceiveDataFromLocalStorage(ctx, req.(*Data))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _AirQualityMonitoring_SendToAggregatedStorage_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(Data)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AirQualityMonitoringServer).SendToAggregatedStorage(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AirQualityMonitoring_SendToAggregatedStorage_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AirQualityMonitoringServer).SendToAggregatedStorage(ctx, req.(*Data))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _AirQualityMonitoring_ReceiveAggregatedData_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(Data)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AirQualityMonitoringServer).ReceiveAggregatedData(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AirQualityMonitoring_ReceiveAggregatedData_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AirQualityMonitoringServer).ReceiveAggregatedData(ctx, req.(*Data))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // AirQualityMonitoring_ServiceDesc is the grpc.ServiceDesc for AirQualityMonitoring service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -160,6 +268,18 @@ var AirQualityMonitoring_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "SendDataToStorage",
 			Handler:    _AirQualityMonitoring_SendDataToStorage_Handler,
+		},
+		{
+			MethodName: "ReceiveDataFromLocalStorage",
+			Handler:    _AirQualityMonitoring_ReceiveDataFromLocalStorage_Handler,
+		},
+		{
+			MethodName: "SendToAggregatedStorage",
+			Handler:    _AirQualityMonitoring_SendToAggregatedStorage_Handler,
+		},
+		{
+			MethodName: "ReceiveAggregatedData",
+			Handler:    _AirQualityMonitoring_ReceiveAggregatedData_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

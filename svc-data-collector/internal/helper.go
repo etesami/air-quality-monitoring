@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-	"strconv"
 	"sync"
 	"time"
 
@@ -98,10 +97,10 @@ func sendToDataIngestionService(client pb.AirQualityMonitoringClient, data map[s
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 
-	sentTimestamp := time.Now().UnixMilli()
+	sentTimestamp := time.Now()
 	ack, err := client.SendDataToIngsetion(ctx, &pb.Data{
 		Payload:       string(jsonString),
-		SentTimestamp: strconv.Itoa(int(sentTimestamp)),
+		SentTimestamp: fmt.Sprintf("%d", int(sentTimestamp.UnixMilli())),
 	})
 	if err != nil {
 		return -1, fmt.Errorf("send data not successful: %v", err)
@@ -109,34 +108,9 @@ func sendToDataIngestionService(client pb.AirQualityMonitoringClient, data map[s
 	if ack.Status != "ok" {
 		return -1, fmt.Errorf("ack status not expected: %s", ack.Status)
 	}
-	rtt := time.Now().UnixMilli() - sentTimestamp
+	rtt := time.Since(sentTimestamp).Milliseconds()
 	log.Printf("Ack recevied. RTT: [%d]ms\n", rtt)
 	return rtt, nil
-}
-
-// updateMetrics updates the metrics with the received RTT
-func updateMetrics(metricList *metric.Metric, rtt int64) {
-	metricList.Lock()
-	defer metricList.Unlock()
-	metricList.RttTimes = append(metricList.RttTimes, float64(rtt))
-	metricList.SuccessCount++
-}
-
-// sendAndUpdateMetrics sends the data to the data ingestion service
-// and updates the metrics with the received RTT
-func sendAndUpdateMetrics(client pb.AirQualityMonitoringClient, locationData map[string]interface{}, metricList *metric.Metric) error {
-	rtt, err := sendToDataIngestionService(client, locationData)
-	if err != nil || rtt < 0 {
-		metricList.Lock()
-		defer metricList.Unlock()
-		metricList.FailureCount++
-		log.Println("Failed to send data to ingestion service")
-		return fmt.Errorf("sending data to ingestion service: %w", err)
-	}
-	if rtt >= 0 {
-		updateMetrics(metricList, rtt)
-	}
-	return nil
 }
 
 // processTicker processes the ticker event
@@ -163,18 +137,27 @@ func ProcessTicker(client pb.AirQualityMonitoringClient, locData *api.LocationDa
 			continue
 		}
 
-		if err := validateDataLocDetails(locationData); err != nil {
-			log.Printf("Error validating location data for ID %s: %v", locationId, err)
-			continue
-		}
-
 		wg.Add(1)
-		go func(locationData map[string]interface{}) {
+		go func(locationData map[string]any, m *metric.Metric) {
 			defer wg.Done()
-			if err := sendAndUpdateMetrics(client, locationData, metricList); err != nil {
-				log.Printf("Error: %v", err)
+			start := time.Now()
+			if err := validateDataLocDetails(locationData); err != nil {
+				log.Printf("Error validating location data for ID %s: %v", locationId, err)
+				m.Failure("collector")
+				return
 			}
-		}(locationData)
+			m.Sucess("collector")
+			m.AddProcessingTime("collector", float64(time.Since(start).Milliseconds())/1000.0)
+
+			rtt, err := sendToDataIngestionService(client, locationData)
+			if err != nil {
+				log.Printf("Error: %v", err)
+				m.Failure("toIngestion")
+			}
+			m.Sucess("toIngestion")
+			m.AddRttTime("toIngestion", float64(rtt)/1000.0)
+
+		}(locationData, metricList)
 	}
 	wg.Wait()
 	return nil
