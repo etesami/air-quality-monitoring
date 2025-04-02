@@ -49,7 +49,7 @@ func main() {
 			break
 		} else {
 			log.Printf("Service is not reachable: %v", err)
-			time.Sleep(1 * time.Second)
+			time.Sleep(3 * time.Second)
 		}
 	}
 
