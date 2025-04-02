@@ -3,9 +3,12 @@ option go_package = "github.com/etesami/air-quality-monitoring/protoc";
 package air_quality_monitoring;
 
 service AirQualityMonitoring {
-    // A simple RPC to send data to the server
+    // A simple RPC to send data to the ingestion service
     // and receive an acknowledgment
-    rpc SendData(Data) returns (Ack);
+    rpc SendDataToIngsetion(Data) returns (Ack);
+    // A simple RPC to send data to the storage service
+    // and receive an acknowledgment
+    rpc SendDataToStorage(Data) returns (Ack);
 }
 
 message Data {

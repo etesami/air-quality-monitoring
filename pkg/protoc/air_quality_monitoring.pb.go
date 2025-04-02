@@ -153,9 +153,10 @@ const file_air_quality_monitoring_proto_rawDesc = "" +
 	"\x06status\x18\x01 \x01(\tR\x06status\x126\n" +
 	"\x17original_sent_timestamp\x18\x02 \x01(\tR\x15originalSentTimestamp\x12-\n" +
 	"\x12received_timestamp\x18\x03 \x01(\tR\x11receivedTimestamp\x12,\n" +
-	"\x12ack_sent_timestamp\x18\x04 \x01(\tR\x10ackSentTimestamp2]\n" +
-	"\x14AirQualityMonitoring\x12E\n" +
-	"\bSendData\x12\x1c.air_quality_monitoring.Data\x1a\x1b.air_quality_monitoring.AckB2Z0github.com/etesami/air-quality-monitoring/protocb\x06proto3"
+	"\x12ack_sent_timestamp\x18\x04 \x01(\tR\x10ackSentTimestamp2\xb8\x01\n" +
+	"\x14AirQualityMonitoring\x12P\n" +
+	"\x13SendDataToIngsetion\x12\x1c.air_quality_monitoring.Data\x1a\x1b.air_quality_monitoring.Ack\x12N\n" +
+	"\x11SendDataToStorage\x12\x1c.air_quality_monitoring.Data\x1a\x1b.air_quality_monitoring.AckB2Z0github.com/etesami/air-quality-monitoring/protocb\x06proto3"
 
 var (
 	file_air_quality_monitoring_proto_rawDescOnce sync.Once
@@ -175,10 +176,12 @@ var file_air_quality_monitoring_proto_goTypes = []any{
 	(*Ack)(nil),  // 1: air_quality_monitoring.Ack
 }
 var file_air_quality_monitoring_proto_depIdxs = []int32{
-	0, // 0: air_quality_monitoring.AirQualityMonitoring.SendData:input_type -> air_quality_monitoring.Data
-	1, // 1: air_quality_monitoring.AirQualityMonitoring.SendData:output_type -> air_quality_monitoring.Ack
-	1, // [1:2] is the sub-list for method output_type
-	0, // [0:1] is the sub-list for method input_type
+	0, // 0: air_quality_monitoring.AirQualityMonitoring.SendDataToIngsetion:input_type -> air_quality_monitoring.Data
+	0, // 1: air_quality_monitoring.AirQualityMonitoring.SendDataToStorage:input_type -> air_quality_monitoring.Data
+	1, // 2: air_quality_monitoring.AirQualityMonitoring.SendDataToIngsetion:output_type -> air_quality_monitoring.Ack
+	1, // 3: air_quality_monitoring.AirQualityMonitoring.SendDataToStorage:output_type -> air_quality_monitoring.Ack
+	2, // [2:4] is the sub-list for method output_type
+	0, // [0:2] is the sub-list for method input_type
 	0, // [0:0] is the sub-list for extension type_name
 	0, // [0:0] is the sub-list for extension extendee
 	0, // [0:0] is the sub-list for field type_name

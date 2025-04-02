@@ -19,16 +19,20 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	AirQualityMonitoring_SendData_FullMethodName = "/air_quality_monitoring.AirQualityMonitoring/SendData"
+	AirQualityMonitoring_SendDataToIngsetion_FullMethodName = "/air_quality_monitoring.AirQualityMonitoring/SendDataToIngsetion"
+	AirQualityMonitoring_SendDataToStorage_FullMethodName   = "/air_quality_monitoring.AirQualityMonitoring/SendDataToStorage"
 )
 
 // AirQualityMonitoringClient is the client API for AirQualityMonitoring service.
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type AirQualityMonitoringClient interface {
-	// A simple RPC to send data to the server
+	// A simple RPC to send data to the ingestion service
 	// and receive an acknowledgment
-	SendData(ctx context.Context, in *Data, opts ...grpc.CallOption) (*Ack, error)
+	SendDataToIngsetion(ctx context.Context, in *Data, opts ...grpc.CallOption) (*Ack, error)
+	// A simple RPC to send data to the storage service
+	// and receive an acknowledgment
+	SendDataToStorage(ctx context.Context, in *Data, opts ...grpc.CallOption) (*Ack, error)
 }
 
 type airQualityMonitoringClient struct {
@@ -39,10 +43,20 @@ func NewAirQualityMonitoringClient(cc grpc.ClientConnInterface) AirQualityMonito
 	return &airQualityMonitoringClient{cc}
 }
 
-func (c *airQualityMonitoringClient) SendData(ctx context.Context, in *Data, opts ...grpc.CallOption) (*Ack, error) {
+func (c *airQualityMonitoringClient) SendDataToIngsetion(ctx context.Context, in *Data, opts ...grpc.CallOption) (*Ack, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(Ack)
-	err := c.cc.Invoke(ctx, AirQualityMonitoring_SendData_FullMethodName, in, out, cOpts...)
+	err := c.cc.Invoke(ctx, AirQualityMonitoring_SendDataToIngsetion_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *airQualityMonitoringClient) SendDataToStorage(ctx context.Context, in *Data, opts ...grpc.CallOption) (*Ack, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(Ack)
+	err := c.cc.Invoke(ctx, AirQualityMonitoring_SendDataToStorage_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -53,9 +67,12 @@ func (c *airQualityMonitoringClient) SendData(ctx context.Context, in *Data, opt
 // All implementations must embed UnimplementedAirQualityMonitoringServer
 // for forward compatibility.
 type AirQualityMonitoringServer interface {
-	// A simple RPC to send data to the server
+	// A simple RPC to send data to the ingestion service
 	// and receive an acknowledgment
-	SendData(context.Context, *Data) (*Ack, error)
+	SendDataToIngsetion(context.Context, *Data) (*Ack, error)
+	// A simple RPC to send data to the storage service
+	// and receive an acknowledgment
+	SendDataToStorage(context.Context, *Data) (*Ack, error)
 	mustEmbedUnimplementedAirQualityMonitoringServer()
 }
 
@@ -66,8 +83,11 @@ type AirQualityMonitoringServer interface {
 // pointer dereference when methods are called.
 type UnimplementedAirQualityMonitoringServer struct{}
 
-func (UnimplementedAirQualityMonitoringServer) SendData(context.Context, *Data) (*Ack, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method SendData not implemented")
+func (UnimplementedAirQualityMonitoringServer) SendDataToIngsetion(context.Context, *Data) (*Ack, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method SendDataToIngsetion not implemented")
+}
+func (UnimplementedAirQualityMonitoringServer) SendDataToStorage(context.Context, *Data) (*Ack, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method SendDataToStorage not implemented")
 }
 func (UnimplementedAirQualityMonitoringServer) mustEmbedUnimplementedAirQualityMonitoringServer() {}
 func (UnimplementedAirQualityMonitoringServer) testEmbeddedByValue()                              {}
@@ -90,20 +110,38 @@ func RegisterAirQualityMonitoringServer(s grpc.ServiceRegistrar, srv AirQualityM
 	s.RegisterService(&AirQualityMonitoring_ServiceDesc, srv)
 }
 
-func _AirQualityMonitoring_SendData_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _AirQualityMonitoring_SendDataToIngsetion_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(Data)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(AirQualityMonitoringServer).SendData(ctx, in)
+		return srv.(AirQualityMonitoringServer).SendDataToIngsetion(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: AirQualityMonitoring_SendData_FullMethodName,
+		FullMethod: AirQualityMonitoring_SendDataToIngsetion_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(AirQualityMonitoringServer).SendData(ctx, req.(*Data))
+		return srv.(AirQualityMonitoringServer).SendDataToIngsetion(ctx, req.(*Data))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _AirQualityMonitoring_SendDataToStorage_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(Data)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AirQualityMonitoringServer).SendDataToStorage(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AirQualityMonitoring_SendDataToStorage_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AirQualityMonitoringServer).SendDataToStorage(ctx, req.(*Data))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -116,8 +154,12 @@ var AirQualityMonitoring_ServiceDesc = grpc.ServiceDesc{
 	HandlerType: (*AirQualityMonitoringServer)(nil),
 	Methods: []grpc.MethodDesc{
 		{
-			MethodName: "SendData",
-			Handler:    _AirQualityMonitoring_SendData_Handler,
+			MethodName: "SendDataToIngsetion",
+			Handler:    _AirQualityMonitoring_SendDataToIngsetion_Handler,
+		},
+		{
+			MethodName: "SendDataToStorage",
+			Handler:    _AirQualityMonitoring_SendDataToStorage_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
