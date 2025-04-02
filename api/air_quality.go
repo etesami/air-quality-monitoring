@@ -1,5 +1,10 @@
 package api
 
+import (
+	"encoding/json"
+	"fmt"
+)
+
 type Attributions struct {
 	URL  string `json:"url"`
 	Name string `json:"name"`
@@ -73,4 +78,51 @@ type AirQualityData struct {
 	Obs    []Observation `json:"obs"`
 	Status string        `json:"status"`
 	Ver    string        `json:"ver"`
+}
+
+func (obs *Observation) Marshalize() (map[string]any, error) {
+	fields := make(map[string]any)
+
+	aqi, err := json.Marshal(obs.Msg.Aqi)
+	if err != nil {
+		return nil, err
+	}
+	fields["aqi"] = aqi
+
+	fields["attributions"], err = json.Marshal(obs.Msg.Attributions)
+	if err != nil {
+		return nil, err
+	}
+
+	fields["city"], err = json.Marshal(obs.Msg.City)
+	if err != nil {
+		return nil, err
+	}
+
+	fields["debug"], err = json.Marshal(obs.Debug)
+	if err != nil {
+		return nil, err
+	}
+
+	fields["dominantpol"] = obs.Msg.DominentPol
+
+	fields["forecast"], err = json.Marshal(obs.Msg.Forecast)
+	if err != nil {
+		return nil, err
+	}
+
+	fields["iaqi"], err = json.Marshal(obs.Msg.IAQI)
+	if err != nil {
+		return nil, err
+	}
+
+	fields["idx"] = fmt.Sprintf("%d", obs.Msg.Idx)
+
+	fields["time"], err = json.Marshal(obs.Msg.Time)
+	if err != nil {
+		return nil, err
+	}
+
+	fields["status"] = obs.Status
+	return fields, nil
 }

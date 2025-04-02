@@ -182,7 +182,7 @@ func (m *Metric) RttHandler() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		queryType := r.URL.Query().Get("type")
-		svcName := r.URL.Query().Get("name")
+		svcName := r.URL.Query().Get("service")
 
 		metric := "rtt"
 		response, err := m.metricHandler(svcName, metric, queryType)
