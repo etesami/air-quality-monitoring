@@ -9,11 +9,24 @@ service AirQualityMonitoring {
     // A simple RPC to send data to the storage service
     // and receive an acknowledgment
     rpc SendDataToStorage(Data) returns (Ack);
+    // A simple RPC to request data from the local storage
+    rpc ReceiveDataFromLocalStorage(Data) returns (DataResponse);
+    // A simple RPC to send data to the aggregated storage service
+    rpc SendToAggregatedStorage(Data) returns (Ack);
+    // A simple RPC to request data from the aggregated storage
+    rpc ReceiveAggregatedData(Data) returns (DataResponse);
 }
 
 message Data {
     string payload = 1;
     string sent_timestamp = 2;
+}
+
+message DataResponse {
+    string status = 1;
+    string payload = 2;
+    string received_timestamp = 3;
+    string sent_timestamp = 4;
 }
 
 message Ack {
