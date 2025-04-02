@@ -3,7 +3,7 @@ module github.com/etesami/air-quality-monitoring/svc-local-storage
 go 1.23.4
 
 require (
-	github.com/etesami/air-quality-monitoring v0.0.0-20250402013232-57b8507db75c
+	github.com/etesami/air-quality-monitoring v0.0.0-20250402014433-336391a1357a
 	github.com/mattn/go-sqlite3 v1.14.25
 	google.golang.org/grpc v1.71.1
 )
