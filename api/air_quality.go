@@ -51,7 +51,7 @@ type Forecast struct {
 		PM10 []ForecastDaily `json:"pm10,omitempty"`
 		PM25 []ForecastDaily `json:"pm25,omitempty"`
 		UVI  []ForecastDaily `json:"uvi,omitempty"`
-	} `json:"daily"`
+	} `json:"daily,omitempty"`
 }
 
 type Msg struct {
@@ -66,10 +66,7 @@ type Msg struct {
 }
 
 type Observation struct {
-	Msg   Msg `json:"msg,omitempty"`
-	Debug struct {
-		Sync string `json:"sync,omitempty"`
-	} `json:"debug,omitempty"`
+	Msg    Msg    `json:"msg,omitempty"`
 	Status string `json:"status,omitempty"`
 	Cached string `json:"cached,omitempty"`
 }
@@ -78,6 +75,21 @@ type AirQualityData struct {
 	Obs    []Observation `json:"obs"`
 	Status string        `json:"status"`
 	Ver    string        `json:"ver,omitempty"`
+}
+
+// Custom Unmarshal method to ignore extra fields
+func (a *AirQualityData) UnmarshalJSON(data []byte) error {
+	type Alias AirQualityData // Prevent recursion
+	aux := &struct {
+		*Alias
+	}{
+		Alias: (*Alias)(a),
+	}
+
+	if err := json.Unmarshal(data, &aux); err != nil {
+		return err
+	}
+	return nil
 }
 
 func (obs *Observation) ToMap() (map[string]any, error) {
@@ -90,7 +102,6 @@ func (obs *Observation) ToMap() (map[string]any, error) {
 		{"aqi", obs.Msg.Aqi},
 		{"attributions", obs.Msg.Attributions},
 		{"city", obs.Msg.City},
-		{"debug", obs.Debug},
 		{"dominantpol", obs.Msg.DominentPol},
 		{"forecast", obs.Msg.Forecast},
 		{"iaqi", obs.Msg.IAQI},
