@@ -2,7 +2,6 @@ package api
 
 import (
 	"encoding/json"
-	"fmt"
 )
 
 type Attributions struct {
@@ -77,21 +76,6 @@ type AirQualityData struct {
 	Ver    string        `json:"ver,omitempty"`
 }
 
-// Custom Unmarshal method to ignore extra fields
-func (a *AirQualityData) UnmarshalJSON(data []byte) error {
-	type Alias AirQualityData // Prevent recursion
-	aux := &struct {
-		*Alias
-	}{
-		Alias: (*Alias)(a),
-	}
-
-	if err := json.Unmarshal(data, &aux); err != nil {
-		return err
-	}
-	return nil
-}
-
 func (obs *Observation) ToMap() (map[string]any, error) {
 	fields := make(map[string]any)
 
@@ -100,12 +84,12 @@ func (obs *Observation) ToMap() (map[string]any, error) {
 		value any
 	}{
 		{"aqi", obs.Msg.Aqi},
+		{"idx", obs.Msg.Idx},
 		{"attributions", obs.Msg.Attributions},
 		{"city", obs.Msg.City},
 		{"dominantpol", obs.Msg.DominentPol},
 		{"forecast", obs.Msg.Forecast},
 		{"iaqi", obs.Msg.IAQI},
-		{"idx", fmt.Sprintf("%d", obs.Msg.Idx)},
 		{"time", obs.Msg.Time},
 		{"status", obs.Status},
 	}

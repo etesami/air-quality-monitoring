@@ -87,19 +87,19 @@ func getLocationData(locationId, token string) (map[string]any, error) {
 
 // sendToDataIngestionService sends the data to the data ingestion service
 // It takes a gRPC client and the data to be sent as parameters
-func sendToDataIngestionService(client pb.AirQualityMonitoringClient, data map[string]any) (int64, error) {
+func sendToDataIngestionService(client pb.AirQualityMonitoringClient, data any) (int64, error) {
 
-	jsonString, err := json.Marshal(data)
+	byteData, err := json.Marshal(data)
 	if err != nil {
 		return -1, fmt.Errorf("failed to marshal data: %v", err)
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
 	sentTimestamp := time.Now()
 	ack, err := client.SendDataToIngsetion(ctx, &pb.Data{
-		Payload:       string(jsonString),
+		Payload:       string(byteData),
 		SentTimestamp: fmt.Sprintf("%d", int(sentTimestamp.UnixMilli())),
 	})
 	if err != nil {
@@ -109,7 +109,7 @@ func sendToDataIngestionService(client pb.AirQualityMonitoringClient, data map[s
 		return -1, fmt.Errorf("ack status not expected: %s", ack.Status)
 	}
 	rtt := time.Since(sentTimestamp).Milliseconds()
-	log.Printf("Ack recevied. RTT: [%d]ms\n", rtt)
+	log.Printf("Sent [%d] bytes. Ack recevied. RTT: [%d]ms\n", len(byteData), rtt)
 	return rtt, nil
 }
 
@@ -128,18 +128,21 @@ func ProcessTicker(client pb.AirQualityMonitoringClient, locData *api.LocationDa
 	if err != nil {
 		return fmt.Errorf("getting location IDs: %w", err)
 	}
+	log.Printf("Location IDs to collect data from: %v\n", locationIds)
 
 	var wg sync.WaitGroup
 	for _, locationId := range locationIds {
-		locationData, err := getLocationData(locationId, locData.Token)
-		if err != nil {
-			log.Printf("Error getting location data for ID %s: %v", locationId, err)
-			continue
-		}
 
 		wg.Add(1)
-		go func(locationData map[string]any, m *metric.Metric) {
+		go func(locationId string, m *metric.Metric) {
 			defer wg.Done()
+
+			locationData, err := getLocationData(locationId, locData.Token)
+			if err != nil {
+				log.Printf("Error getting location data for ID %s: %v", locationId, err)
+				return
+			}
+
 			start := time.Now()
 			if err := validateDataLocDetails(locationData); err != nil {
 				log.Printf("Error validating location data for ID %s: %v", locationId, err)
@@ -149,7 +152,7 @@ func ProcessTicker(client pb.AirQualityMonitoringClient, locData *api.LocationDa
 			m.Sucess("collector")
 			m.AddProcessingTime("collector", float64(time.Since(start).Milliseconds())/1000.0)
 
-			rtt, err := sendToDataIngestionService(client, locationData)
+			rtt, err := sendToDataIngestionService(client, locationData["rxs"])
 			if err != nil {
 				log.Printf("Error: %v", err)
 				m.Failure("toIngestion")
@@ -157,7 +160,7 @@ func ProcessTicker(client pb.AirQualityMonitoringClient, locData *api.LocationDa
 			m.Sucess("toIngestion")
 			m.AddRttTime("toIngestion", float64(rtt)/1000.0)
 
-		}(locationData, metricList)
+		}(locationId, metricList)
 	}
 	wg.Wait()
 	return nil
