@@ -80,49 +80,32 @@ type AirQualityData struct {
 	Ver    string        `json:"ver"`
 }
 
-func (obs *Observation) Marshalize() (map[string]any, error) {
+func (obs *Observation) ToMap() (map[string]any, error) {
 	fields := make(map[string]any)
 
-	aqi, err := json.Marshal(obs.Msg.Aqi)
-	if err != nil {
-		return nil, err
-	}
-	fields["aqi"] = aqi
-
-	fields["attributions"], err = json.Marshal(obs.Msg.Attributions)
-	if err != nil {
-		return nil, err
-	}
-
-	fields["city"], err = json.Marshal(obs.Msg.City)
-	if err != nil {
-		return nil, err
-	}
-
-	fields["debug"], err = json.Marshal(obs.Debug)
-	if err != nil {
-		return nil, err
+	marshaled := []struct {
+		key   string
+		value any
+	}{
+		{"aqi", obs.Msg.Aqi},
+		{"attributions", obs.Msg.Attributions},
+		{"city", obs.Msg.City},
+		{"debug", obs.Debug},
+		{"dominantpol", obs.Msg.DominentPol},
+		{"forecast", obs.Msg.Forecast},
+		{"iaqi", obs.Msg.IAQI},
+		{"idx", fmt.Sprintf("%d", obs.Msg.Idx)},
+		{"time", obs.Msg.Time},
+		{"status", obs.Status},
 	}
 
-	fields["dominantpol"] = obs.Msg.DominentPol
-
-	fields["forecast"], err = json.Marshal(obs.Msg.Forecast)
-	if err != nil {
-		return nil, err
+	for _, item := range marshaled {
+		if jsonData, err := json.Marshal(item.value); err != nil {
+			return nil, err
+		} else {
+			fields[item.key] = string(jsonData)
+		}
 	}
 
-	fields["iaqi"], err = json.Marshal(obs.Msg.IAQI)
-	if err != nil {
-		return nil, err
-	}
-
-	fields["idx"] = fmt.Sprintf("%d", obs.Msg.Idx)
-
-	fields["time"], err = json.Marshal(obs.Msg.Time)
-	if err != nil {
-		return nil, err
-	}
-
-	fields["status"] = obs.Status
 	return fields, nil
 }
