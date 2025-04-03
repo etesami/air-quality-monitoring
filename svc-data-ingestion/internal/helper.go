@@ -13,6 +13,7 @@ import (
 	api "github.com/etesami/air-quality-monitoring/api"
 	metric "github.com/etesami/air-quality-monitoring/pkg/metric"
 	pb "github.com/etesami/air-quality-monitoring/pkg/protoc"
+	utils "github.com/etesami/air-quality-monitoring/pkg/utils"
 )
 
 type Server struct {
@@ -42,15 +43,22 @@ func (s Server) SendDataToIngsetion(ctx context.Context, recData *pb.Data) (*pb.
 		s.Metric.AddProcessingTime("ingestion", float64(processingTime)/1000.0)
 
 		// Sneding to the storage
+		if *s.Client == nil {
+			log.Printf("Client is not ready yet")
+			s.Metric.Failure("toLocalStorage")
+			return
+		}
+
 		rtt, err := sendDataToStorage(*s.Client, data)
 		if err != nil {
 			log.Printf("Error sending data to storage: %v", err)
 			s.Metric.Failure("toLocalStorage")
 			return
 		}
-		log.Printf("Sent data to local storage. Len: [%d], RTT: [%d]ms\n", len(payload), rtt)
+
 		s.Metric.Sucess("toLocalStorage")
-		s.Metric.AddRttTime("toLocalStorage", float64(rtt)/1000.0)
+		s.Metric.AddRttTime("toLocalStorage", rtt)
+
 	}(recData.Payload)
 
 	ack := &pb.Ack{
@@ -63,7 +71,7 @@ func (s Server) SendDataToIngsetion(ctx context.Context, recData *pb.Data) (*pb.
 	return ack, nil
 }
 
-func sendDataToStorage(client pb.AirQualityMonitoringClient, d *api.AirQualityData) (int64, error) {
+func sendDataToStorage(client pb.AirQualityMonitoringClient, d *api.AirQualityData) (float64, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
@@ -84,7 +92,10 @@ func sendDataToStorage(client pb.AirQualityMonitoringClient, d *api.AirQualityDa
 	if ack.Status != "ok" {
 		return -1, fmt.Errorf("ack status not expected: %s", ack.Status)
 	}
-	rtt := time.Since(sentTimestamp).Milliseconds()
-	log.Printf("Sent [%d] bytes to local storage. Ack recevied. RTT: [%d]ms\n", len(byteData), rtt)
+	log.Printf("Sent [%d] bytes. Ack recevied.\n", len(byteData))
+	rtt, err := utils.CalculateRtt(sentTimestamp, time.Now(), *ack)
+	if err != nil {
+		return -1, fmt.Errorf("error calculating RTT: %v", err)
+	}
 	return rtt, nil
 }
