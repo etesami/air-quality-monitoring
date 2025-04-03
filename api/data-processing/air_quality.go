@@ -3,7 +3,7 @@ package dataprocessing
 type EnhancedDataResponse struct {
 	City           `json:"city,omitempty"`
 	AirQualityData `json:"airQualityData,omitempty"`
-	Alert          `json:"alert,omitempty"`
+	*Alert         `json:"alert,omitempty"`
 }
 
 type City struct {
@@ -24,6 +24,22 @@ type Alert struct {
 	AlertHeadline    string `json:"alertHeadline,omitempty"`
 	AlertDescription string `json:"alertDescription,omitempty"`
 	AlertEvent       string `json:"alertEvent,omitempty"`
+}
+
+type AlertRaw struct {
+	AreaDesc    string `json:"areaDesc,omitempty"`
+	Sent        string `json:"sent,omitempty"`
+	Effective   string `json:"effective,omitempty"`
+	Expires     string `json:"expires,omitempty"`
+	Ends        string `json:"ends,omitempty"`
+	Status      string `json:"status,omitempty"`
+	Certainty   string `json:"certainty,omitempty"`
+	Urgency     string `json:"urgency,omitempty"`
+	Event       string `json:"event,omitempty"`
+	Headline    string `json:"headline,omitempty"`
+	Description string `json:"description,omitempty"`
+	Instruction string `json:"instruction,omitempty"`
+	Severity    string `json:"severity,omitempty"`
 }
 
 type AirQualityData struct {

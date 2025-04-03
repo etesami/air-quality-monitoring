@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"net/http"
@@ -26,18 +27,19 @@ func main() {
 	}
 
 	// Local storage service initialization
+	// We need both target services to be reachable, otherwise we cannot process
 	svcTargetLocalAddress := os.Getenv("SVC_TARGET_LOCAL_STORAGE_ADD")
 	svcTargetLocalPort := os.Getenv("SVC_TARGET_LOCAL_STORAGE_PORT")
-	targetLocalSvc := &api.Service{
+	targetLocalStrgSvc := &api.Service{
 		Address: svcTargetLocalAddress,
 		Port:    svcTargetLocalPort,
 	}
 	// Wait until the target service is reachable
 	for {
-		if err := targetLocalSvc.ServiceReachable(); err == nil {
+		if err := targetLocalStrgSvc.ServiceReachable(); err == nil {
 			break
 		} else {
-			log.Printf("Service [%s:%s] is not reachable: %v", targetLocalSvc.Address, targetLocalSvc.Port, err)
+			log.Printf("Service [%s:%s] is not reachable: %v", targetLocalStrgSvc.Address, targetLocalStrgSvc.Port, err)
 			time.Sleep(3 * time.Second)
 		}
 	}
@@ -45,50 +47,52 @@ func main() {
 	// Aggregated storage service initialization
 	svcTargetAggrAddress := os.Getenv("SVC_TARGET_AGGR_STORAGE_ADD")
 	svcTargetAggrPort := os.Getenv("SVC_TARGET_AGGR_STORAGE_PORT")
-	targetAggrSvc := &api.Service{
+	targetAggrStrgSvc := &api.Service{
 		Address: svcTargetAggrAddress,
 		Port:    svcTargetAggrPort,
 	}
 	// Wait until the target service is reachable
 	for {
-		if err := targetAggrSvc.ServiceReachable(); err == nil {
+		if err := targetAggrStrgSvc.ServiceReachable(); err == nil {
 			break
 		} else {
-			log.Printf("Service [%s:%s] is not reachable: %v", targetAggrSvc.Address, targetAggrSvc.Port, err)
+			log.Printf("Service [%s:%s] is not reachable: %v", targetAggrStrgSvc.Address, targetAggrStrgSvc.Port, err)
 			time.Sleep(3 * time.Second)
 		}
 	}
 
 	connLocal, err := grpc.NewClient(
-		targetLocalSvc.Address+":"+targetLocalSvc.Port,
+		targetLocalStrgSvc.Address+":"+targetLocalStrgSvc.Port,
 		grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		log.Fatalf("did not connect to target [local storage] service: %v", err)
 	}
 	defer connLocal.Close()
-	log.Printf("Connected to target [local storage] service: %s:%s\n", targetLocalSvc.Address, targetLocalSvc.Port)
+	log.Printf("Connected to target [local storage] service: %s:%s\n", targetLocalStrgSvc.Address, targetLocalStrgSvc.Port)
 	clientLocal := pb.NewAirQualityMonitoringClient(connLocal)
 
 	connAggr, err := grpc.NewClient(
-		targetAggrSvc.Address+":"+targetAggrSvc.Port,
+		targetAggrStrgSvc.Address+":"+targetAggrStrgSvc.Port,
 		grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		log.Fatalf("did not connect to target [aggregated storage] service: %v", err)
 	}
 	defer connAggr.Close()
-	log.Printf("Connected to target [aggregated storage] service: %s:%s\n", targetAggrSvc.Address, targetAggrSvc.Port)
+	log.Printf("Connected to target [aggregated storage] service: %s:%s\n", targetAggrStrgSvc.Address, targetAggrStrgSvc.Port)
 	clientAggr := pb.NewAirQualityMonitoringClient(connAggr)
 	// var clientAggr pb.AirQualityMonitoringClient
 
 	go func(m *metric.Metric, clientLocal pb.AirQualityMonitoringClient, clientAggr pb.AirQualityMonitoringClient) {
 		// Target local storage service initialization
-		ticker := time.NewTicker(5 * time.Second)
+		ctx := context.Background()
+		ticker := time.NewTicker(1 * time.Minute)
 		defer ticker.Stop()
 
 		for range ticker.C {
-			if err := internal.ProcessTicker(clientLocal, clientAggr, m); err != nil {
+			if err := internal.ProcessTicker(ctx, clientLocal, clientAggr, m); err != nil {
 				log.Printf("Error during processing: %v", err)
 			}
+			ctx = context.WithValue(ctx, "lastCall", time.Now())
 
 			// TODO: Remove the break
 			break

@@ -1,5 +1,7 @@
-github.com/etesami/air-quality-monitoring v0.0.0-20250403185911-5bbd5b0c887c h1:HL3QjqyN6FqZiwXPL9UOM/1bigHeCNafbGuqJYtpA2U=
-github.com/etesami/air-quality-monitoring v0.0.0-20250403185911-5bbd5b0c887c/go.mod h1:LexX7Rm57Cb0eQufFICe9ht7puYQzfS4fKXV5t5UrBw=
+github.com/etesami/air-quality-monitoring v0.0.0-20250403201920-470d3c7ad938 h1:B9QqXpHHAo5T4WEx4LRzKlHxdB9RYUvwlSn7RybDJWQ=
+github.com/etesami/air-quality-monitoring v0.0.0-20250403201920-470d3c7ad938/go.mod h1:LexX7Rm57Cb0eQufFICe9ht7puYQzfS4fKXV5t5UrBw=
+github.com/etesami/air-quality-monitoring v0.0.0-20250403202450-612d973d6250 h1:TzPL1Uy9t/oyPjEwVrNWLK0G4+xEM52GT/am387eQbI=
+github.com/etesami/air-quality-monitoring v0.0.0-20250403202450-612d973d6250/go.mod h1:LexX7Rm57Cb0eQufFICe9ht7puYQzfS4fKXV5t5UrBw=
 github.com/go-logr/logr v1.4.2 h1:6pFjapn8bFcIbiKo3XT4j/BhANplGihG6tvd+8rYgrY=
 github.com/go-logr/logr v1.4.2/go.mod h1:9T104GzyrTigFIr8wt5mBrctHMim0Nb2HLGrmQ40KvY=
 github.com/go-logr/stdr v1.2.2 h1:hSWxHoqTgW2S2qGc0LTAI563KZ5YKYRhT3MFKZMbjag=

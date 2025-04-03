@@ -9,9 +9,9 @@ import (
 	"time"
 
 	api "github.com/etesami/air-quality-monitoring/api"
+	localapi "github.com/etesami/air-quality-monitoring/api/local-storage"
 	"github.com/etesami/air-quality-monitoring/pkg/metric"
 	pb "github.com/etesami/air-quality-monitoring/pkg/protoc"
-	localapi "github.com/etesami/air-quality-monitoring/svc-local-storage/api"
 	_ "github.com/mattn/go-sqlite3"
 )
 

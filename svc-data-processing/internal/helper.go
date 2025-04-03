@@ -11,13 +11,10 @@ import (
 	"github.com/etesami/air-quality-monitoring/api"
 	"github.com/etesami/air-quality-monitoring/pkg/metric"
 	pb "github.com/etesami/air-quality-monitoring/pkg/protoc"
-)
 
-type DataRequest struct {
-	StartTime   string `json:"startTime,omitempty"`
-	EndTime     string `json:"endTime,omitempty"`
-	RequestType string `json:"requestType,omitempty"`
-}
+	dpapi "github.com/etesami/air-quality-monitoring/api/data-processing"
+	loapi "github.com/etesami/air-quality-monitoring/api/local-storage"
+)
 
 type AlertRaw struct {
 	AreaDesc    string `json:"areaDesc,omitempty"`
@@ -35,54 +32,23 @@ type AlertRaw struct {
 	Severity    string `json:"severity,omitempty"`
 }
 
-type DataResponse struct {
-	City           `json:"city,omitempty"`
-	AirQualityData `json:"airQualityData,omitempty"`
-	Alert1         `json:"alert,omitempty"`
-}
-
-type City struct {
-	Idx      int64   `json:"idx,omitempty"`
-	CityName string  `json:"cityName,omitempty"`
-	Lat      float64 `json:"lat,omitempty"`
-	Lng      float64 `json:"lng,omitempty"`
-}
-
-type Alert1 struct {
-	AlertDesc        string `json:"alertDesc,omitempty"`
-	AlertEffective   string `json:"alertEffective,omitempty"`
-	AlertExpires     string `json:"alertExpires,omitempty"`
-	AlertStatus      string `json:"alertStatus,omitempty"`
-	AlertCertainty   string `json:"alertCertainty,omitempty"`
-	AlertUrgency     string `json:"alertUrgency,omitempty"`
-	AlertSeverity    string `json:"alertSeverity,omitempty"`
-	AlertHeadline    string `json:"alertHeadline,omitempty"`
-	AlertDescription string `json:"alertDescription,omitempty"`
-	AlertEvent       string `json:"alertEvent,omitempty"`
-}
-
-// This is a modifed version of the original msg struct
-// with fewer fields
-type AirQualityData struct {
-	Timestamp   string `json:"timestamp,omitempty"`
-	Aqi         int64  `json:"aqi,omitempty"`
-	DewPoint    int64  `json:"dewPoint,omitempty"`
-	Humidity    int64  `json:"humidity,omitempty"`
-	Pressure    int64  `json:"pressure,omitempty"`
-	Temperature int64  `json:"temperature,omitempty"`
-	WindSpeed   int64  `json:"windSpeed,omitempty"`
-	WindGust    int64  `json:"windGust,omitempty"`
-	PM25        int64  `json:"pm25,omitempty"`
-	PM10        int64  `json:"pm10,omitempty"`
-}
-
 // requestNewData requests new data from the local storage service
-func requestNewData(client pb.AirQualityMonitoringClient) (int64, string, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+func requestNewData(ctx context.Context, client pb.AirQualityMonitoringClient) (int64, string, error) {
+	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 
-	reqBody := DataRequest{
-		StartTime: time.Now().Add(-48 * time.Hour).Format(time.RFC3339),
+	// Check context if we have a last call time
+	// If so, use that as the start time
+	var startTime string
+	if lastCall := ctx.Value("lastCall"); lastCall != nil {
+		sTime := lastCall.(time.Time)
+		startTime = sTime.Format(time.RFC3339)
+	} else {
+		startTime = time.Now().Add(-8 * time.Hour).Format(time.RFC3339)
+	}
+
+	reqBody := loapi.DataRequest{
+		StartTime: startTime,
 		EndTime:   time.Now().Format(time.RFC3339),
 	}
 	reqByte, err := json.Marshal(reqBody)
@@ -109,21 +75,21 @@ func requestNewData(client pb.AirQualityMonitoringClient) (int64, string, error)
 
 // processData performs a few calculation along with enhancing data with additional information
 // from api.weather.gov
-func processData(res string) ([]DataResponse, error) {
+func processData(res string) ([]dpapi.EnhancedDataResponse, error) {
 	// Expect response to be a list of items
 	msgList := make([]api.Msg, 0)
 	if err := json.Unmarshal([]byte(res), &msgList); err != nil {
 		return nil, fmt.Errorf("error unmarshalling JSON: %v", err)
 	}
 
-	procRespList := make([]DataResponse, 0)
+	procRespList := make([]dpapi.EnhancedDataResponse, 0)
 	for _, msg := range msgList {
 		geoAlerts, err := getAlertsforPoint(msg.City.Geo[0], msg.City.Geo[1])
 		if err != nil {
 			log.Printf("error getting alerts for point: %v", err)
 			continue
 		}
-		alert := &Alert1{}
+		alert := &dpapi.Alert{}
 		if geoAlerts == nil {
 			log.Printf("no alerts found for point: %f, %f\n", msg.City.Geo[0], msg.City.Geo[1])
 		} else {
@@ -138,14 +104,14 @@ func processData(res string) ([]DataResponse, error) {
 			alert.AlertDescription = geoAlerts.Description
 			alert.AlertEvent = geoAlerts.Event
 		}
-		procRes := DataResponse{
-			City: City{
+		procRes := dpapi.EnhancedDataResponse{
+			City: dpapi.City{
 				Idx:      int64(msg.Idx),
 				CityName: msg.City.Name,
 				Lat:      msg.City.Geo[0],
 				Lng:      msg.City.Geo[1],
 			},
-			AirQualityData: AirQualityData{
+			AirQualityData: dpapi.AirQualityData{
 				Timestamp:   msg.Time.ISO,
 				Aqi:         int64(msg.Aqi),
 				DewPoint:    int64(msg.IAQI.H.V),
@@ -156,7 +122,7 @@ func processData(res string) ([]DataResponse, error) {
 				WindGust:    int64(msg.IAQI.WG.V),
 				PM25:        int64(msg.IAQI.PM25.V),
 			},
-			Alert1: *alert,
+			Alert: *alert,
 		}
 		procRespList = append(procRespList, procRes)
 	}
@@ -241,9 +207,9 @@ func sendDataToStorage(client pb.AirQualityMonitoringClient, data string) (int64
 }
 
 // processTicker processes the ticker event
-func ProcessTicker(clientLocal, clientAggr pb.AirQualityMonitoringClient, m *metric.Metric) error {
+func ProcessTicker(ctx context.Context, clientLocal, clientAggr pb.AirQualityMonitoringClient, m *metric.Metric) error {
 	// TODO: think about the rtt, this time includes the processing time of the remote service
-	_, recData, err := requestNewData(clientLocal)
+	_, recData, err := requestNewData(ctx, clientLocal)
 	if err != nil {
 		log.Printf("Error requesting new data: %v", err)
 		return err
