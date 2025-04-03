@@ -11,6 +11,7 @@ import (
 	api "github.com/etesami/air-quality-monitoring/api"
 	"github.com/etesami/air-quality-monitoring/pkg/metric"
 	pb "github.com/etesami/air-quality-monitoring/pkg/protoc"
+	localapi "github.com/etesami/air-quality-monitoring/svc-local-storage/api"
 	_ "github.com/mattn/go-sqlite3"
 )
 
@@ -18,101 +19,6 @@ type Server struct {
 	pb.UnimplementedAirQualityMonitoringServer
 	Metric *metric.Metric
 	Db     *sql.DB
-}
-
-type DataRequest struct {
-	StartTime   string `json:"startTime,omitempty"`
-	EndTime     string `json:"endTime,omitempty"`
-	RequestType string `json:"requestType,omitempty"`
-}
-
-// requestDataFromDb queries the database for data after the given timestamp
-func requestDataFromDb(db *sql.DB, dataRequest *DataRequest) (string, error) {
-	type dbResponse struct {
-		ID           int                `json:"id,omitempty"`
-		Aqi          int                `json:"aqi,omitempty"`
-		Idx          int                `json:"idx,omitempty"`
-		Attributions []api.Attributions `json:"attributions,omitempty"`
-		City         api.City           `json:"city,omitempty"`
-		DominentPol  string             `json:"dominantpol,omitempty"`
-		IAQI         api.IAQI           `json:"iaqi,omitempty"`
-		Timestamp    time.Time          `json:"timestamp,omitempty"`
-		Forecast     api.Forecast       `json:"forecast,omitempty"`
-		Status       string             `json:"status,omitempty"`
-	}
-
-	msgList := make([]dbResponse, 0)
-	if dataRequest.StartTime != "" && dataRequest.EndTime != "" {
-		ttStart, err1 := IsoToTime(dataRequest.StartTime)
-		ttEnd, err2 := IsoToTime(dataRequest.EndTime)
-		if err1 != nil || err2 != nil {
-			log.Printf("Error parsing timestamp: %v", fmt.Errorf("%v, %v", err1, err2))
-			return "", fmt.Errorf("%v, %v", err1, err2)
-		}
-		rows, err := db.Query("SELECT * FROM air_quality WHERE timestamp > $1 AND timestamp < $2", ttStart, ttEnd)
-		if err != nil {
-			return "", err
-		}
-		defer rows.Close()
-
-		for rows.Next() {
-			var msg dbResponse
-			var atr string
-			var city string
-			var forecast string
-			var iaqi string
-			if err := rows.Scan(
-				&msg.ID, &msg.Aqi, &msg.Idx, &msg.Timestamp,
-				&atr, &city, &msg.DominentPol,
-				&forecast, &iaqi, &msg.Status); err != nil {
-				log.Printf("Error scanning row: %v", err)
-				continue
-			}
-			if err := json.Unmarshal([]byte(atr), &msg.Attributions); err != nil {
-				log.Printf("Error unmarshalling attributions: %v", err)
-				continue
-			}
-			if err := json.Unmarshal([]byte(city), &msg.City); err != nil {
-				log.Printf("Error unmarshalling city: %v", err)
-				continue
-			}
-			if err := json.Unmarshal([]byte(forecast), &msg.Forecast); err != nil {
-				log.Printf("Error unmarshalling forecast: %v", err)
-				continue
-			}
-			if err := json.Unmarshal([]byte(iaqi), &msg.IAQI); err != nil {
-				log.Printf("Error unmarshalling iaqi: %v", err)
-				continue
-			}
-			msgList = append(msgList, msg)
-		}
-
-		dataList := make([]api.Msg, 0)
-		for _, msg := range msgList {
-			dataList = append(dataList, api.Msg{
-				Aqi:          msg.Aqi,
-				Idx:          msg.Idx,
-				Attributions: msg.Attributions,
-				City:         msg.City,
-				DominentPol:  msg.DominentPol,
-				IAQI:         msg.IAQI,
-				Time:         api.Time{ISO: msg.Timestamp.Format(time.RFC3339)},
-				Forecast:     msg.Forecast,
-			})
-		}
-
-		jsonResponse, err := json.Marshal(dataList)
-		if err != nil {
-			log.Printf("Error marshalling data: %v", err)
-			return "", err
-		}
-		return string(jsonResponse), nil
-	}
-
-	if dataRequest.RequestType != "" {
-		// TODO: handle based on request type
-	}
-	return "", nil
 }
 
 // ReceiveDataFromLocalStorage receive data request from the processing service
@@ -123,7 +29,7 @@ func (s Server) ReceiveDataFromLocalStorage(ctx context.Context, req *pb.Data) (
 	ReceivedTimestamp := receivedTime.UnixMilli()
 	log.Printf("Received request for data: [%d]\n", len(req.Payload))
 
-	var dataRequest DataRequest
+	var dataRequest localapi.DataRequest
 	if err := json.Unmarshal([]byte(req.Payload), &dataRequest); err != nil {
 		log.Printf("Error unmarshalling JSON: %v", err)
 		return nil, err
@@ -185,6 +91,83 @@ func (s Server) SendDataToStorage(ctx context.Context, recData *pb.Data) (*pb.Ac
 	return ack, nil
 }
 
+// requestDataFromDb queries the database for data after the given timestamp
+func requestDataFromDb(db *sql.DB, dataRequest *localapi.DataRequest) (string, error) {
+
+	msgList := make([]localapi.DataResponse, 0)
+	if dataRequest.StartTime != "" && dataRequest.EndTime != "" {
+		ttStart, err1 := time.Parse(time.RFC3339, dataRequest.StartTime)
+		ttEnd, err2 := time.Parse(time.RFC3339, dataRequest.EndTime)
+		if err1 != nil || err2 != nil {
+			log.Printf("Error parsing timestamp: %v", fmt.Errorf("%v, %v", err1, err2))
+			return "", fmt.Errorf("%v, %v", err1, err2)
+		}
+		rows, err := db.Query("SELECT * FROM air_quality WHERE timestamp > $1 AND timestamp < $2", ttStart, ttEnd)
+		if err != nil {
+			return "", err
+		}
+		defer rows.Close()
+
+		for rows.Next() {
+			var msg localapi.DataResponse
+			var atr string
+			var city string
+			var forecast string
+			var iaqi string
+			if err := rows.Scan(
+				&msg.ID, &msg.Aqi, &msg.Idx, &msg.Timestamp,
+				&atr, &city, &msg.DominentPol,
+				&forecast, &iaqi, &msg.Status); err != nil {
+				log.Printf("Error scanning row: %v", err)
+				continue
+			}
+			if err := json.Unmarshal([]byte(atr), &msg.Attributions); err != nil {
+				log.Printf("Error unmarshalling attributions: %v", err)
+				continue
+			}
+			if err := json.Unmarshal([]byte(city), &msg.City); err != nil {
+				log.Printf("Error unmarshalling city: %v", err)
+				continue
+			}
+			if err := json.Unmarshal([]byte(forecast), &msg.Forecast); err != nil {
+				log.Printf("Error unmarshalling forecast: %v", err)
+				continue
+			}
+			if err := json.Unmarshal([]byte(iaqi), &msg.IAQI); err != nil {
+				log.Printf("Error unmarshalling iaqi: %v", err)
+				continue
+			}
+			msgList = append(msgList, msg)
+		}
+
+		dataList := make([]api.Msg, 0)
+		for _, msg := range msgList {
+			dataList = append(dataList, api.Msg{
+				Aqi:          msg.Aqi,
+				Idx:          msg.Idx,
+				Attributions: msg.Attributions,
+				City:         msg.City,
+				DominentPol:  msg.DominentPol,
+				IAQI:         msg.IAQI,
+				Time:         api.Time{ISO: msg.Timestamp.Format(time.RFC3339)},
+				Forecast:     msg.Forecast,
+			})
+		}
+
+		jsonResponse, err := json.Marshal(dataList)
+		if err != nil {
+			log.Printf("Error marshalling data: %v", err)
+			return "", err
+		}
+		return string(jsonResponse), nil
+	}
+
+	if dataRequest.RequestType != "" {
+		// TODO: handle based on request type
+	}
+	return "", nil
+}
+
 // timestampIsNewer compares the given timestamp with the latest one in the database
 // and returns true if the given timestamp is newer
 func timestampIsNewer(db *sql.DB, sId string, timestamp time.Time) (bool, error) {
@@ -204,20 +187,6 @@ func timestampIsNewer(db *sql.DB, sId string, timestamp time.Time) (bool, error)
 	return false, nil
 }
 
-// stringToTime converts a string to time.Time
-func stringToTime(dateStr string) (time.Time, error) {
-	layout := "2006-01-02 15:04:05"
-	return time.Parse(layout, dateStr)
-}
-
-func IsoToTime(dateStr string) (time.Time, error) {
-	return time.Parse(time.RFC3339, dateStr)
-}
-
-func millisToTime(millis int64) time.Time {
-	return time.Unix(0, millis*int64(time.Millisecond))
-}
-
 func insertToAirQualityDb(db *sql.DB, data api.AirQualityData) error {
 	// Use a transaction for safety
 	tx, err := db.Begin()
@@ -233,7 +202,7 @@ func insertToAirQualityDb(db *sql.DB, data api.AirQualityData) error {
 			return fmt.Errorf("received status is not ok: %s", obs.Status)
 		}
 
-		tt, err := IsoToTime(obs.Msg.Time.ISO)
+		tt, err := time.Parse(time.RFC3339, obs.Msg.Time.ISO)
 		if err != nil {
 			log.Printf("Error parsing timestamp: %v", err)
 			continue

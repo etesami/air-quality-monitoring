@@ -38,8 +38,8 @@ func createTables(db *sql.DB) error {
 
 func main() {
 
-	svcAddress := os.Getenv("SVC_LOCAL_ADD")
-	svcPort := os.Getenv("SVC_LOCAL_PORT")
+	svcAddress := os.Getenv("SVC_LOCAL_STORAGE_ADDR")
+	svcPort := os.Getenv("SVC_LOCAL_STORAGE_PORT")
 	thisSvc := &api.Service{
 		Address: svcAddress,
 		Port:    svcPort,
