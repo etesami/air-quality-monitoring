@@ -1,4 +1,4 @@
-package api
+package localstorage
 
 import (
 	"time"
