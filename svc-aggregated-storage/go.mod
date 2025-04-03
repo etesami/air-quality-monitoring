@@ -1,9 +1,10 @@
-module github.com/etesami/air-quality-monitoring/svc-data-ingestion
+module github.com/etesami/air-quality-monitoring/svc-aggregated-storage
 
 go 1.23.4
 
 require (
-	github.com/etesami/air-quality-monitoring v0.0.0-20250402223923-0fb33e0dd6cd
+	github.com/etesami/air-quality-monitoring v0.0.0-20250402225553-268947f4c8ce
+	github.com/mattn/go-sqlite3 v1.14.27
 	google.golang.org/grpc v1.71.1
 )
 

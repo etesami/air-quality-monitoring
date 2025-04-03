@@ -6,13 +6,16 @@ service AirQualityMonitoring {
     // A simple RPC to send data to the ingestion service
     // and receive an acknowledgment
     rpc SendDataToIngsetion(Data) returns (Ack);
+    
     // A simple RPC to send data to the storage service
     // and receive an acknowledgment
     rpc SendDataToStorage(Data) returns (Ack);
+
     // A simple RPC to request data from the local storage
     rpc ReceiveDataFromLocalStorage(Data) returns (DataResponse);
     // A simple RPC to send data to the aggregated storage service
     rpc SendToAggregatedStorage(Data) returns (Ack);
+    
     // A simple RPC to request data from the aggregated storage
     rpc ReceiveAggregatedData(Data) returns (DataResponse);
 }

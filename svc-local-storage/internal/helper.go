@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
-	"strconv"
 	"time"
 
 	api "github.com/etesami/air-quality-monitoring/api"
@@ -21,41 +20,137 @@ type Server struct {
 	Db     *sql.DB
 }
 
-// func (s Server) ReceiveDataFromLocalStorage(ctx context.Context, req *pb.Data) (*pb.DataResponse, error) {
-// 	receivedTime := time.Now()
-// 	ReceivedTimestamp := receivedTime.UnixMilli()
-// 	log.Printf("Received request for data: [%d]\n", len(req.Payload))
+type DataRequest struct {
+	StartTime   string `json:"startTime,omitempty"`
+	EndTime     string `json:"endTime,omitempty"`
+	RequestType string `json:"requestType,omitempty"`
+}
 
-// 	// should get the data from database, compare the timestamp and send any
-// 	// new data to the client
-// 	// TODO: Complete this part
-
-// 	res := &pb.DataResponse{
-// 		Status:                "ok",
-// 		Payload: ,
-// 		ReceivedTimestamp:     strconv.Itoa(int(ReceivedTimestamp)),
-// 		SentTimestamp:      strconv.Itoa(int(time.Now().UnixMilli())),
-// 	}
-// 	return res, nil
-// }
-
-// timestampIsNewer compares the given timestamp with the latest one in the database
-// and returns true if the given timestamp is newer
-func timestampIsNewer(db *sql.DB, sId string, timestamp time.Time) (bool, error) {
-	var maxTime *time.Time
-	row := db.QueryRow("SELECT MAX(timestamp) FROM air_quality WHERE idx = $1", sId)
-	err := row.Scan(&maxTime)
-	if err != nil && err != sql.ErrNoRows {
-		return false, err
-	}
-	if maxTime == nil {
-		return true, nil
-	}
-	if timestamp.After(*maxTime) {
-		return true, nil
+// requestDataFromDb queries the database for data after the given timestamp
+func requestDataFromDb(db *sql.DB, dataRequest *DataRequest) (string, error) {
+	type dbResponse struct {
+		ID           int                `json:"id,omitempty"`
+		Aqi          int                `json:"aqi,omitempty"`
+		Idx          int                `json:"idx,omitempty"`
+		Attributions []api.Attributions `json:"attributions,omitempty"`
+		City         api.City           `json:"city,omitempty"`
+		DominentPol  string             `json:"dominantpol,omitempty"`
+		IAQI         api.IAQI           `json:"iaqi,omitempty"`
+		Timestamp    time.Time          `json:"timestamp,omitempty"`
+		Forecast     api.Forecast       `json:"forecast,omitempty"`
+		Status       string             `json:"status,omitempty"`
 	}
 
-	return false, nil
+	msgList := make([]dbResponse, 0)
+	if dataRequest.StartTime != "" && dataRequest.EndTime != "" {
+		ttStart, err1 := IsoToTime(dataRequest.StartTime)
+		ttEnd, err2 := IsoToTime(dataRequest.EndTime)
+		if err1 != nil || err2 != nil {
+			log.Printf("Error parsing timestamp: %v", fmt.Errorf("%v, %v", err1, err2))
+			return "", fmt.Errorf("%v, %v", err1, err2)
+		}
+		rows, err := db.Query("SELECT * FROM air_quality WHERE timestamp > $1 AND timestamp < $2", ttStart, ttEnd)
+		if err != nil {
+			return "", err
+		}
+		defer rows.Close()
+
+		for rows.Next() {
+			var msg dbResponse
+			var atr string
+			var city string
+			var forecast string
+			var iaqi string
+			if err := rows.Scan(
+				&msg.ID, &msg.Aqi, &msg.Idx, &msg.Timestamp,
+				&atr, &city, &msg.DominentPol,
+				&forecast, &iaqi, &msg.Status); err != nil {
+				log.Printf("Error scanning row: %v", err)
+				continue
+			}
+			if err := json.Unmarshal([]byte(atr), &msg.Attributions); err != nil {
+				log.Printf("Error unmarshalling attributions: %v", err)
+				continue
+			}
+			if err := json.Unmarshal([]byte(city), &msg.City); err != nil {
+				log.Printf("Error unmarshalling city: %v", err)
+				continue
+			}
+			if err := json.Unmarshal([]byte(forecast), &msg.Forecast); err != nil {
+				log.Printf("Error unmarshalling forecast: %v", err)
+				continue
+			}
+			if err := json.Unmarshal([]byte(iaqi), &msg.IAQI); err != nil {
+				log.Printf("Error unmarshalling iaqi: %v", err)
+				continue
+			}
+			msgList = append(msgList, msg)
+		}
+
+		dataList := make([]api.Msg, 0)
+		for _, msg := range msgList {
+			dataList = append(dataList, api.Msg{
+				Aqi:          msg.Aqi,
+				Idx:          msg.Idx,
+				Attributions: msg.Attributions,
+				City:         msg.City,
+				DominentPol:  msg.DominentPol,
+				IAQI:         msg.IAQI,
+				Time:         api.Time{ISO: msg.Timestamp.Format(time.RFC3339)},
+				Forecast:     msg.Forecast,
+			})
+		}
+
+		jsonResponse, err := json.Marshal(dataList)
+		if err != nil {
+			log.Printf("Error marshalling data: %v", err)
+			return "", err
+		}
+		return string(jsonResponse), nil
+	}
+
+	if dataRequest.RequestType != "" {
+		// TODO: handle based on request type
+	}
+	return "", nil
+}
+
+// ReceiveDataFromLocalStorage receive data request from the processing service
+// and send the data that are newer than the timestamp in the request.
+// If there is no timestamp in the request, it will send all available data
+func (s Server) ReceiveDataFromLocalStorage(ctx context.Context, req *pb.Data) (*pb.DataResponse, error) {
+	receivedTime := time.Now()
+	ReceivedTimestamp := receivedTime.UnixMilli()
+	log.Printf("Received request for data: [%d]\n", len(req.Payload))
+
+	var dataRequest DataRequest
+	if err := json.Unmarshal([]byte(req.Payload), &dataRequest); err != nil {
+		log.Printf("Error unmarshalling JSON: %v", err)
+		return nil, err
+	}
+
+	dataToBeSent, err := requestDataFromDb(s.Db, &dataRequest)
+	if err != nil {
+		log.Printf("Error requesting data: %v", err)
+		return nil, err
+	}
+	if dataToBeSent == "" {
+		log.Printf("No data to be sent")
+		return &pb.DataResponse{
+			Status:            "no_data",
+			Payload:           "",
+			ReceivedTimestamp: fmt.Sprintf("%d", int(ReceivedTimestamp)),
+			SentTimestamp:     fmt.Sprintf("%d", int(time.Now().UnixMilli())),
+		}, nil
+	}
+
+	res := &pb.DataResponse{
+		Status:            "ok",
+		Payload:           dataToBeSent,
+		ReceivedTimestamp: fmt.Sprintf("%d", int(ReceivedTimestamp)),
+		SentTimestamp:     fmt.Sprintf("%d", int(time.Now().UnixMilli())),
+	}
+	return res, nil
 }
 
 // SendDataToStorage receives data from the ingestion service and stores it in the database
@@ -84,10 +179,29 @@ func (s Server) SendDataToStorage(ctx context.Context, recData *pb.Data) (*pb.Ac
 	ack := &pb.Ack{
 		Status:                "ok",
 		OriginalSentTimestamp: recData.SentTimestamp,
-		ReceivedTimestamp:     strconv.Itoa(int(ReceivedTimestamp)),
-		AckSentTimestamp:      strconv.Itoa(int(time.Now().UnixMilli())),
+		ReceivedTimestamp:     fmt.Sprintf("%d", int(ReceivedTimestamp)),
+		AckSentTimestamp:      fmt.Sprintf("%d", int(time.Now().UnixMilli())),
 	}
 	return ack, nil
+}
+
+// timestampIsNewer compares the given timestamp with the latest one in the database
+// and returns true if the given timestamp is newer
+func timestampIsNewer(db *sql.DB, sId string, timestamp time.Time) (bool, error) {
+	var maxTime *time.Time
+	row := db.QueryRow("SELECT MAX(timestamp) FROM air_quality WHERE idx = $1", sId)
+	err := row.Scan(&maxTime)
+	if err != nil && err != sql.ErrNoRows {
+		return false, err
+	}
+	if maxTime == nil {
+		return true, nil
+	}
+	if timestamp.After(*maxTime) {
+		return true, nil
+	}
+
+	return false, nil
 }
 
 // stringToTime converts a string to time.Time
