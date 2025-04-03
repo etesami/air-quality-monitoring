@@ -43,8 +43,8 @@ func createTables(db *sql.DB) error {
 		`CREATE TABLE IF NOT EXISTS alert (
 				hash TEXT PRIMARY KEY UNIQUE,
 				alertDesc TEXT,
-				alertEffective TEXT,
-				alertExpires TEXT,
+				alertEffective DATETIME,
+				alertExpires DATETIME,
 				alertStatus TEXT,
 				alertCertainty TEXT,
 				alertUrgency TEXT,
