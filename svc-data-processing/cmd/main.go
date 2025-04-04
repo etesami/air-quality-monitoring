@@ -28,8 +28,8 @@ func main() {
 
 	// Local storage service initialization
 	// We need both target services to be reachable, otherwise we cannot process
-	svcTargetLocalAddress := os.Getenv("SVC_TARGET_LOCAL_STORAGE_ADD")
-	svcTargetLocalPort := os.Getenv("SVC_TARGET_LOCAL_STORAGE_PORT")
+	svcTargetLocalAddress := os.Getenv("SVC_TA_LO_STRG_ADDR")
+	svcTargetLocalPort := os.Getenv("SVC_TA_LO_STRG_PORT")
 	targetLocalStrgSvc := &api.Service{
 		Address: svcTargetLocalAddress,
 		Port:    svcTargetLocalPort,
@@ -45,8 +45,8 @@ func main() {
 	}
 
 	// Aggregated storage service initialization
-	svcTargetAggrAddress := os.Getenv("SVC_TARGET_AGGR_STORAGE_ADD")
-	svcTargetAggrPort := os.Getenv("SVC_TARGET_AGGR_STORAGE_PORT")
+	svcTargetAggrAddress := os.Getenv("SVC_TA_AGGR_STRG_ADDR")
+	svcTargetAggrPort := os.Getenv("SVC_TA_AGGR_STRG_PORT")
 	targetAggrStrgSvc := &api.Service{
 		Address: svcTargetAggrAddress,
 		Port:    svcTargetAggrPort,
@@ -85,26 +85,27 @@ func main() {
 	go func(m *metric.Metric, clientLocal pb.AirQualityMonitoringClient, clientAggr pb.AirQualityMonitoringClient) {
 		// Target local storage service initialization
 		ctx := context.Background()
-		ticker := time.NewTicker(1 * time.Minute)
+		ticker := time.NewTicker(15 * time.Second)
 		defer ticker.Stop()
 
 		for range ticker.C {
 			if err := internal.ProcessTicker(ctx, clientLocal, clientAggr, m); err != nil {
 				log.Printf("Error during processing: %v", err)
 			}
-			ctx = context.WithValue(ctx, "lastCall", time.Now())
+			// We check for up to one hour in advance, to cover for time inconsistencies
+			// between the the external data sources
+			ctx = context.WithValue(ctx, "lastCall", time.Now().Add(1*time.Hour))
 
-			// TODO: Remove the break
-			break
 		}
 
 	}(m, clientLocal, clientAggr)
 
-	metricPort := os.Getenv("METRIC_PORT")
+	metricAddr := os.Getenv("SVC_LO_DP_METRIC_ADDR")
+	metricPort := os.Getenv("SVC_LO_DP_METRIC_PORT")
 	log.Printf("Starting metric server on :%s\n", metricPort)
 	http.HandleFunc("/metrics", m.IndexHandler())
 	http.HandleFunc("/metrics/rtt", m.RttHandler())
 	http.HandleFunc("/metrics/processing", m.ProcessingTimeHandler())
-	log.Fatal(http.ListenAndServe(fmt.Sprintf(":%s", metricPort), nil))
+	log.Fatal(http.ListenAndServe(fmt.Sprintf("%s:%s", metricAddr, metricPort), nil))
 
 }

@@ -3,7 +3,7 @@ module github.com/etesami/air-quality-monitoring/svc-data-dashboard
 go 1.23.4
 
 require (
-	github.com/etesami/air-quality-monitoring v0.0.0-20250402225553-268947f4c8ce
+	github.com/etesami/air-quality-monitoring v0.0.0-20250403231031-4d897f336829
 	google.golang.org/grpc v1.71.1
 )
 

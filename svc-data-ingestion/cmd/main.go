@@ -19,8 +19,8 @@ import (
 
 func main() {
 	// Target service initialization
-	svcTargetAddress := os.Getenv("SVC_TARGET_LOCAL_STRG_ADDR")
-	svcTargetPort := os.Getenv("SVC_TARGET_LOCAL_STRG_PORT")
+	svcTargetAddress := os.Getenv("SVC_TA_LO_STRG_ADDR")
+	svcTargetPort := os.Getenv("SVC_TA_LO_STRG_PORT")
 	targetSvc := &api.Service{
 		Address: svcTargetAddress,
 		Port:    svcTargetPort,
@@ -58,8 +58,8 @@ func main() {
 	}
 
 	// Local service initialization
-	svcAddress := os.Getenv("SVC_LOCAL_INGESTION_ADDR")
-	svcPort := os.Getenv("SVC_LOCAL_INGESTION_PORT")
+	svcAddress := os.Getenv("SVC_LO_INGST_ADDR")
+	svcPort := os.Getenv("SVC_LO_INGST_PORT")
 	localSvc := &api.Service{
 		Address: svcAddress,
 		Port:    svcPort,
@@ -84,10 +84,11 @@ func main() {
 		}
 	}()
 
-	metricPort := os.Getenv("METRIC_PORT")
+	metricAddr := os.Getenv("SVC_LO_INGST_METRIC_ADDR")
+	metricPort := os.Getenv("SVC_LO_INGST_METRIC_PORT")
 	http.HandleFunc("/metrics", metricList.IndexHandler())
 	http.HandleFunc("/metrics/rtt", metricList.RttHandler())
 	http.HandleFunc("/metrics/processing", metricList.ProcessingTimeHandler())
 	log.Printf("Starting server on :%s\n", metricPort)
-	log.Fatal(http.ListenAndServe(fmt.Sprintf(":%s", metricPort), nil))
+	log.Fatal(http.ListenAndServe(fmt.Sprintf("%s:%s", metricAddr, metricPort), nil))
 }

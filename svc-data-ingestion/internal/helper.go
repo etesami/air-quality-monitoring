@@ -49,7 +49,24 @@ func (s Server) SendDataToIngsetion(ctx context.Context, recData *pb.Data) (*pb.
 			return
 		}
 
-		rtt, err := sendDataToStorage(*s.Client, data)
+		// Make sure there is no empty data (with enpty city name)
+		preprocessedData := &api.AirQualityData{
+			Status: data.Status,
+			Ver:    data.Ver,
+		}
+		for _, obs := range data.Obs {
+			if obs.Msg.City.Name == "" {
+				log.Printf("City name is empty, skipping observation")
+				continue
+			}
+			preprocessedData.Obs = append(preprocessedData.Obs, obs)
+		}
+		if len(preprocessedData.Obs) == 0 {
+			log.Printf("No valid observations found, skipping data")
+			return
+		}
+
+		rtt, err := sendDataToStorage(*s.Client, preprocessedData)
 		if err != nil {
 			log.Printf("Error sending data to storage: %v", err)
 			s.Metric.Failure("toLocalStorage")

@@ -163,9 +163,6 @@ func ProcessTicker(client pb.AirQualityMonitoringClient, locData *api.LocationDa
 			m.AddRttTime("toIngestion", float64(rtt)/1000.0)
 
 		}(locationId, metricList)
-
-		// TODO: remove me
-		break
 	}
 
 	wg.Wait()

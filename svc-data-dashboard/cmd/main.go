@@ -26,8 +26,8 @@ func main() {
 	}
 
 	// Aggregated storage service initialization
-	svcTargetAggrAddress := os.Getenv("SVC_TARGET_AGGR_STORAGE_ADD")
-	svcTargetAggrPort := os.Getenv("SVC_TARGET_AGGR_STORAGE_PORT")
+	svcTargetAggrAddress := os.Getenv("SVC_TA_AGGR_STRG_ADDR")
+	svcTargetAggrPort := os.Getenv("SVC_TA_AGGR_STRG_PORT")
 	targetAggrSvc := &api.Service{
 		Address: svcTargetAggrAddress,
 		Port:    svcTargetAggrPort,
@@ -54,25 +54,22 @@ func main() {
 
 	go func(m *metric.Metric, clientAggr pb.AirQualityMonitoringClient) {
 		// Target local storage service initialization
-		ticker := time.NewTicker(5 * time.Second)
+		ticker := time.NewTicker(20 * time.Second)
 		defer ticker.Stop()
 
 		for range ticker.C {
 			if err := internal.ProcessTicker(clientAggr, clientAggr, m); err != nil {
 				log.Printf("Error during processing: %v", err)
 			}
-
-			// TODO: Remove the break
-			break
 		}
 
 	}(m, clientAggr)
 
-	metricPort := os.Getenv("METRIC_PORT")
+	metricAddr := os.Getenv("SVC_LO_DASH_METRIC_ADDR")
+	metricPort := os.Getenv("SVC_LO_DASH_METRIC_PORT")
 	log.Printf("Starting metric server on :%s\n", metricPort)
 	http.HandleFunc("/metrics", m.IndexHandler())
 	http.HandleFunc("/metrics/rtt", m.RttHandler())
 	http.HandleFunc("/metrics/processing", m.ProcessingTimeHandler())
-	log.Fatal(http.ListenAndServe(fmt.Sprintf(":%s", metricPort), nil))
-
+	log.Fatal(http.ListenAndServe(fmt.Sprintf("%s:%s", metricAddr, metricPort), nil))
 }

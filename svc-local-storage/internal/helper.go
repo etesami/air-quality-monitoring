@@ -95,13 +95,16 @@ func (s Server) SendDataToStorage(ctx context.Context, recData *pb.Data) (*pb.Ac
 func requestDataFromDb(db *sql.DB, dataRequest *localapi.DataRequest) (string, error) {
 
 	msgList := make([]localapi.DataResponse, 0)
+
 	if dataRequest.StartTime != "" && dataRequest.EndTime != "" {
+
 		ttStart, err1 := time.Parse(time.RFC3339, dataRequest.StartTime)
 		ttEnd, err2 := time.Parse(time.RFC3339, dataRequest.EndTime)
 		if err1 != nil || err2 != nil {
 			log.Printf("Error parsing timestamp: %v", fmt.Errorf("%v, %v", err1, err2))
 			return "", fmt.Errorf("%v, %v", err1, err2)
 		}
+
 		rows, err := db.Query("SELECT * FROM air_quality WHERE timestamp > $1 AND timestamp < $2", ttStart, ttEnd)
 		if err != nil {
 			return "", err
@@ -153,6 +156,7 @@ func requestDataFromDb(db *sql.DB, dataRequest *localapi.DataRequest) (string, e
 				Forecast:     msg.Forecast,
 			})
 		}
+		log.Printf("Found [%d] items in the database for req.\n", len(dataList))
 
 		jsonResponse, err := json.Marshal(dataList)
 		if err != nil {
@@ -171,20 +175,37 @@ func requestDataFromDb(db *sql.DB, dataRequest *localapi.DataRequest) (string, e
 // timestampIsNewer compares the given timestamp with the latest one in the database
 // and returns true if the given timestamp is newer
 func timestampIsNewer(db *sql.DB, sId string, timestamp time.Time) (bool, error) {
-	var maxTime *time.Time
+	var maxTimeStr sql.NullString
+
 	row := db.QueryRow("SELECT MAX(timestamp) FROM air_quality WHERE idx = $1", sId)
-	err := row.Scan(&maxTime)
+	err := row.Scan(&maxTimeStr)
 	if err != nil && err != sql.ErrNoRows {
 		return false, err
 	}
-	if maxTime == nil {
+	if !maxTimeStr.Valid {
 		return true, nil
 	}
-	if timestamp.After(*maxTime) {
+
+	maxTime, err := time.Parse("2006-01-02 15:04:05-07:00", maxTimeStr.String) // Adjust format if necessary
+	if err != nil {
+		return false, fmt.Errorf("error parsing max timestamp: %v", err)
+	}
+
+	if timestamp.After(maxTime) {
 		return true, nil
 	}
 
 	return false, nil
+}
+
+func printObject(obj api.Observation) {
+	// Convert the object to JSON
+	objByte, err := json.Marshal(obj)
+	if err != nil {
+		log.Printf("Error marshalling object for printing: %v", err)
+		return
+	}
+	log.Printf("Object: %s\n", string(objByte))
 }
 
 func insertToAirQualityDb(db *sql.DB, data api.AirQualityData) error {
@@ -199,12 +220,14 @@ func insertToAirQualityDb(db *sql.DB, data api.AirQualityData) error {
 		// with the rest of the observation
 		if obs.Status != "ok" {
 			log.Printf("Received status is not ok: %s", obs.Status)
-			return fmt.Errorf("received status is not ok: %s", obs.Status)
+			printObject(obs)
+			continue
 		}
 
 		tt, err := time.Parse(time.RFC3339, obs.Msg.Time.ISO)
 		if err != nil {
 			log.Printf("Error parsing timestamp: %v", err)
+			printObject(obs)
 			continue
 		}
 
@@ -239,8 +262,9 @@ func insertToAirQualityDb(db *sql.DB, data api.AirQualityData) error {
 			tx.Rollback()
 			return err
 		}
+		log.Printf("Inserted data into the database: [%s]", obs.Msg.Time.ISO)
 	}
 
-	log.Printf("Inserted [%d] items into the database.", len(data.Obs))
+	log.Printf("Inserted [%d] items in total.", len(data.Obs))
 	return tx.Commit()
 }

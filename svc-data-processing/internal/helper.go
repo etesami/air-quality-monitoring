@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"sync"
 	"time"
 
 	"github.com/etesami/air-quality-monitoring/api"
@@ -16,22 +17,6 @@ import (
 	loapi "github.com/etesami/air-quality-monitoring/api/local-storage"
 )
 
-type AlertRaw struct {
-	AreaDesc    string `json:"areaDesc,omitempty"`
-	Sent        string `json:"sent,omitempty"`
-	Effective   string `json:"effective,omitempty"`
-	Expires     string `json:"expires,omitempty"`
-	Ends        string `json:"ends,omitempty"`
-	Status      string `json:"status,omitempty"`
-	Certainty   string `json:"certainty,omitempty"`
-	Urgency     string `json:"urgency,omitempty"`
-	Event       string `json:"event,omitempty"`
-	Headline    string `json:"headline,omitempty"`
-	Description string `json:"description,omitempty"`
-	Instruction string `json:"instruction,omitempty"`
-	Severity    string `json:"severity,omitempty"`
-}
-
 // requestNewData requests new data from the local storage service
 func requestNewData(ctx context.Context, client pb.AirQualityMonitoringClient) (int64, string, error) {
 	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
@@ -40,6 +25,7 @@ func requestNewData(ctx context.Context, client pb.AirQualityMonitoringClient) (
 	// Check context if we have a last call time
 	// If so, use that as the start time
 	var startTime string
+	endTime := time.Now().Add(1 * time.Hour).Format(time.RFC3339)
 	if lastCall := ctx.Value("lastCall"); lastCall != nil {
 		sTime := lastCall.(time.Time)
 		startTime = sTime.Format(time.RFC3339)
@@ -49,12 +35,13 @@ func requestNewData(ctx context.Context, client pb.AirQualityMonitoringClient) (
 
 	reqBody := loapi.DataRequest{
 		StartTime: startTime,
-		EndTime:   time.Now().Format(time.RFC3339),
+		EndTime:   endTime,
 	}
 	reqByte, err := json.Marshal(reqBody)
 	if err != nil {
 		return -1, "", fmt.Errorf("error marshalling JSON: %v", err)
 	}
+	log.Printf("Requesting data from [%s] to [%s]\n", startTime, endTime)
 
 	sentTimestamp := time.Now()
 	res, err := client.ReceiveDataFromLocalStorage(ctx, &pb.Data{
@@ -81,56 +68,74 @@ func processData(res string) ([]dpapi.EnhancedDataResponse, error) {
 	if err := json.Unmarshal([]byte(res), &msgList); err != nil {
 		return nil, fmt.Errorf("error unmarshalling JSON: %v", err)
 	}
+	log.Printf("Received [%d] items from local storage\n", len(msgList))
+
+	var wg sync.WaitGroup
+	respChan := make(chan dpapi.EnhancedDataResponse)
+	for _, msg := range msgList {
+		wg.Add(1)
+		go func(m api.Msg) {
+			defer wg.Done()
+
+			geoAlerts, err := getAlertsforPoint(msg.City.Geo[0], msg.City.Geo[1])
+			if err != nil {
+				log.Printf("error getting alerts for point: %v", err)
+				return
+			}
+
+			alert := &dpapi.Alert{}
+			if geoAlerts == nil {
+				log.Printf("no alerts found for point: %f, %f\n", msg.City.Geo[0], msg.City.Geo[1])
+				alert = nil
+			} else {
+				alert.AlertDesc = geoAlerts.Description
+				alert.AlertEffective = geoAlerts.Effective
+				alert.AlertExpires = geoAlerts.Expires
+				alert.AlertStatus = geoAlerts.Status
+				alert.AlertCertainty = geoAlerts.Certainty
+				alert.AlertUrgency = geoAlerts.Urgency
+				alert.AlertSeverity = geoAlerts.Severity
+				alert.AlertHeadline = geoAlerts.Headline
+				alert.AlertDescription = geoAlerts.Description
+				alert.AlertEvent = geoAlerts.Event
+			}
+
+			procRes := dpapi.EnhancedDataResponse{
+				City: dpapi.City{
+					Idx:      int64(msg.Idx),
+					CityName: msg.City.Name,
+					Lat:      msg.City.Geo[0],
+					Lng:      msg.City.Geo[1],
+				},
+				AirQualityData: dpapi.AirQualityData{
+					Timestamp:   msg.Time.ISO,
+					Aqi:         int64(msg.Aqi),
+					DewPoint:    int64(msg.IAQI.H.V),
+					Humidity:    int64(msg.IAQI.H.V),
+					Pressure:    int64(msg.IAQI.P.V),
+					Temperature: int64(msg.IAQI.T.V),
+					WindSpeed:   int64(msg.IAQI.W.V),
+					WindGust:    int64(msg.IAQI.WG.V),
+					PM25:        int64(msg.IAQI.PM25.V),
+				},
+				Alert: alert,
+			}
+			respChan <- procRes
+		}(msg)
+	}
+	go func() {
+		wg.Wait()
+		close(respChan)
+	}()
 
 	procRespList := make([]dpapi.EnhancedDataResponse, 0)
-	for _, msg := range msgList {
-		geoAlerts, err := getAlertsforPoint(msg.City.Geo[0], msg.City.Geo[1])
-		if err != nil {
-			log.Printf("error getting alerts for point: %v", err)
-			continue
-		}
-		alert := &dpapi.Alert{}
-		if geoAlerts == nil {
-			log.Printf("no alerts found for point: %f, %f\n", msg.City.Geo[0], msg.City.Geo[1])
-		} else {
-			alert.AlertDesc = geoAlerts.Description
-			alert.AlertEffective = geoAlerts.Effective
-			alert.AlertExpires = geoAlerts.Expires
-			alert.AlertStatus = geoAlerts.Status
-			alert.AlertCertainty = geoAlerts.Certainty
-			alert.AlertUrgency = geoAlerts.Urgency
-			alert.AlertSeverity = geoAlerts.Severity
-			alert.AlertHeadline = geoAlerts.Headline
-			alert.AlertDescription = geoAlerts.Description
-			alert.AlertEvent = geoAlerts.Event
-		}
-		procRes := dpapi.EnhancedDataResponse{
-			City: dpapi.City{
-				Idx:      int64(msg.Idx),
-				CityName: msg.City.Name,
-				Lat:      msg.City.Geo[0],
-				Lng:      msg.City.Geo[1],
-			},
-			AirQualityData: dpapi.AirQualityData{
-				Timestamp:   msg.Time.ISO,
-				Aqi:         int64(msg.Aqi),
-				DewPoint:    int64(msg.IAQI.H.V),
-				Humidity:    int64(msg.IAQI.H.V),
-				Pressure:    int64(msg.IAQI.P.V),
-				Temperature: int64(msg.IAQI.T.V),
-				WindSpeed:   int64(msg.IAQI.W.V),
-				WindGust:    int64(msg.IAQI.WG.V),
-				PM25:        int64(msg.IAQI.PM25.V),
-			},
-			Alert: *alert,
-		}
-		procRespList = append(procRespList, procRes)
+	for response := range respChan {
+		procRespList = append(procRespList, response)
 	}
-
 	return procRespList, nil
 }
 
-func getAlertsforPoint(lat, lng float64) (*AlertRaw, error) {
+func getAlertsforPoint(lat, lng float64) (*dpapi.AlertRaw, error) {
 	url := fmt.Sprintf("https://api.weather.gov/alerts?point=%f,%f", lat, lng)
 
 	client := &http.Client{}
@@ -161,14 +166,14 @@ func getAlertsforPoint(lat, lng float64) (*AlertRaw, error) {
 	return alert, nil
 }
 
-func generateAlertStruct(res map[string]any) (*AlertRaw, error) {
+func generateAlertStruct(res map[string]any) (*dpapi.AlertRaw, error) {
 	if o, ok := res["features"].([]any); ok {
 		if len(o) == 0 {
 			return nil, nil
 		}
 		if f, ok := o[0].(map[string]any); ok {
 			if p, ok := f["properties"].(map[string]any); ok {
-				alert := &AlertRaw{}
+				alert := &dpapi.AlertRaw{}
 				// Marshal the properties to get bytes
 				pBytes, err := json.Marshal(p)
 				if err != nil {
@@ -223,14 +228,16 @@ func ProcessTicker(ctx context.Context, clientLocal, clientAggr pb.AirQualityMon
 	if err != nil {
 		log.Printf("Error processing data: %v", err)
 	}
+	if len(processedData) == 0 {
+		log.Printf("No data to be sent to aggregated storage")
+		return nil
+	}
+	log.Printf("Processed [%d] items.\n", len(processedData))
 
 	procResBytes, err := json.Marshal(processedData)
 	if err != nil {
 		log.Printf("Error marshalling processed data: %v", err)
 	}
-	log.Printf("Processed data: %s\n", string(procResBytes))
-
-	// send processed data to the aggregated storage service
 
 	go func(d string) {
 		// TODO: handle RTT

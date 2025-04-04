@@ -38,8 +38,8 @@ func createTables(db *sql.DB) error {
 
 func main() {
 
-	svcAddress := os.Getenv("SVC_LOCAL_STORAGE_ADDR")
-	svcPort := os.Getenv("SVC_LOCAL_STORAGE_PORT")
+	svcAddress := os.Getenv("SVC_LO_STRG_ADDR")
+	svcPort := os.Getenv("SVC_LO_STRG_PORT")
 	thisSvc := &api.Service{
 		Address: svcAddress,
 		Port:    svcPort,
@@ -77,10 +77,11 @@ func main() {
 		}
 	}()
 
-	metricPort := os.Getenv("METRIC_PORT")
+	metricAddr := os.Getenv("SVC_LO_STRG_METRIC_ADDR")
+	metricPort := os.Getenv("SVC_LO_STRG_METRIC_PORT")
 	log.Printf("Starting metric server on :%s\n", metricPort)
 	http.HandleFunc("/metrics", metricList.IndexHandler())
 	http.HandleFunc("/metrics/rtt", metricList.RttHandler())
 	http.HandleFunc("/metrics/processing", metricList.ProcessingTimeHandler())
-	log.Fatal(http.ListenAndServe(fmt.Sprintf(":%s", metricPort), nil))
+	log.Fatal(http.ListenAndServe(fmt.Sprintf("%s:%s", metricAddr, metricPort), nil))
 }

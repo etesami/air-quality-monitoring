@@ -37,8 +37,8 @@ func main() {
 		Token: token,
 	}
 
-	svcAddress := os.Getenv("SVC_TARGET_COLLECTOR_ADDR")
-	svcPort := os.Getenv("SVC_TARGET_COLLECTOR_PORT")
+	svcAddress := os.Getenv("SVC_TA_INGESTION_ADDR")
+	svcPort := os.Getenv("SVC_TA_INGESTION_PORT")
 	svc := &api.Service{
 		Address: svcAddress,
 		Port:    svcPort,
@@ -71,6 +71,7 @@ func main() {
 	// Call api evey 60 seconds
 	// TODO: Adjust the time
 	ticker := time.NewTicker(5 * time.Second)
+	// ticker := time.NewTicker(10 * time.Minute)
 	defer ticker.Stop()
 
 	go func() {
@@ -78,15 +79,15 @@ func main() {
 			if err := internal.ProcessTicker(client, locData, metricList); err != nil {
 				log.Printf("Error during processing: %v", err)
 			}
-			// TODO: Remove the break
 			break
 		}
 	}()
 
-	metricPort := os.Getenv("METRIC_PORT")
+	metricAddr := os.Getenv("SVC_LO_COLC_METRIC_ADDR")
+	metricPort := os.Getenv("SVC_LO_COLC_METRIC_PORT")
 	http.HandleFunc("/metrics", metricList.IndexHandler())
 	http.HandleFunc("/metrics/rtt", metricList.RttHandler())
 	http.HandleFunc("/metrics/processing", metricList.ProcessingTimeHandler())
 	log.Printf("Starting server on :%s\n", metricPort)
-	log.Fatal(http.ListenAndServe(fmt.Sprintf(":%s", metricPort), nil))
+	log.Fatal(http.ListenAndServe(fmt.Sprintf("%s:%s", metricAddr, metricPort), nil))
 }
