@@ -245,6 +245,14 @@ func (m *Metric) ProcessingTimeHandler() http.HandlerFunc {
 }
 
 func buildResponse(s string, tName string, t any) map[string]any {
+	if slice, ok := t.([]float64); ok {
+		return map[string]any{
+			"service": s,
+			"metrics": map[string]any{
+				tName: slice,
+			},
+		}
+	}
 	return map[string]any{
 		"service": s,
 		"metrics": map[string]any{
@@ -277,6 +285,8 @@ func (m *Metric) metricHandler(s string, metricType string, queryType string) (a
 		percentiles := []float64{25, 50, 75, 90, 95, 99}
 		response = buildResponse(s, "percentiles", m.Percentiles(s, metricType, percentiles))
 	case "all":
+		// TODO: Fix precentiles
+		// prc := m.Percentiles(s, metricType, []float64{25, 50, 75, 90, 95, 99})
 		response = map[string]any{
 			"service": s,
 			"metrics": map[string]any{
@@ -288,7 +298,6 @@ func (m *Metric) metricHandler(s string, metricType string, queryType string) (a
 				"count":        m.Count(s, metricType),
 				"stddev":       m.StdDev(s, metricType),
 				"variance":     m.Variance(s, metricType),
-				"percentiles":  m.Percentiles(s, metricType, []float64{25, 50, 75, 90, 95, 99}),
 			},
 		}
 	default:

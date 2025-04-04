@@ -226,13 +226,11 @@ const file_air_quality_monitoring_proto_rawDesc = "" +
 	"\x06status\x18\x01 \x01(\tR\x06status\x126\n" +
 	"\x17original_sent_timestamp\x18\x02 \x01(\tR\x15originalSentTimestamp\x12-\n" +
 	"\x12received_timestamp\x18\x03 \x01(\tR\x11receivedTimestamp\x12,\n" +
-	"\x12ack_sent_timestamp\x18\x04 \x01(\tR\x10ackSentTimestamp2\xce\x03\n" +
-	"\x14AirQualityMonitoring\x12P\n" +
-	"\x13SendDataToIngsetion\x12\x1c.air_quality_monitoring.Data\x1a\x1b.air_quality_monitoring.Ack\x12N\n" +
-	"\x11SendDataToStorage\x12\x1c.air_quality_monitoring.Data\x1a\x1b.air_quality_monitoring.Ack\x12a\n" +
-	"\x1bReceiveDataFromLocalStorage\x12\x1c.air_quality_monitoring.Data\x1a$.air_quality_monitoring.DataResponse\x12T\n" +
-	"\x17SendToAggregatedStorage\x12\x1c.air_quality_monitoring.Data\x1a\x1b.air_quality_monitoring.Ack\x12[\n" +
-	"\x15ReceiveAggregatedData\x12\x1c.air_quality_monitoring.Data\x1a$.air_quality_monitoring.DataResponseB2Z0github.com/etesami/air-quality-monitoring/protocb\x06proto3"
+	"\x12ack_sent_timestamp\x18\x04 \x01(\tR\x10ackSentTimestamp2\x90\x02\n" +
+	"\x14AirQualityMonitoring\x12M\n" +
+	"\x10SendDataToServer\x12\x1c.air_quality_monitoring.Data\x1a\x1b.air_quality_monitoring.Ack\x12[\n" +
+	"\x15ReceiveDataFromServer\x12\x1c.air_quality_monitoring.Data\x1a$.air_quality_monitoring.DataResponse\x12L\n" +
+	"\x0fCheckConnection\x12\x1c.air_quality_monitoring.Data\x1a\x1b.air_quality_monitoring.AckB2Z0github.com/etesami/air-quality-monitoring/protocb\x06proto3"
 
 var (
 	file_air_quality_monitoring_proto_rawDescOnce sync.Once
@@ -253,18 +251,14 @@ var file_air_quality_monitoring_proto_goTypes = []any{
 	(*Ack)(nil),          // 2: air_quality_monitoring.Ack
 }
 var file_air_quality_monitoring_proto_depIdxs = []int32{
-	0, // 0: air_quality_monitoring.AirQualityMonitoring.SendDataToIngsetion:input_type -> air_quality_monitoring.Data
-	0, // 1: air_quality_monitoring.AirQualityMonitoring.SendDataToStorage:input_type -> air_quality_monitoring.Data
-	0, // 2: air_quality_monitoring.AirQualityMonitoring.ReceiveDataFromLocalStorage:input_type -> air_quality_monitoring.Data
-	0, // 3: air_quality_monitoring.AirQualityMonitoring.SendToAggregatedStorage:input_type -> air_quality_monitoring.Data
-	0, // 4: air_quality_monitoring.AirQualityMonitoring.ReceiveAggregatedData:input_type -> air_quality_monitoring.Data
-	2, // 5: air_quality_monitoring.AirQualityMonitoring.SendDataToIngsetion:output_type -> air_quality_monitoring.Ack
-	2, // 6: air_quality_monitoring.AirQualityMonitoring.SendDataToStorage:output_type -> air_quality_monitoring.Ack
-	1, // 7: air_quality_monitoring.AirQualityMonitoring.ReceiveDataFromLocalStorage:output_type -> air_quality_monitoring.DataResponse
-	2, // 8: air_quality_monitoring.AirQualityMonitoring.SendToAggregatedStorage:output_type -> air_quality_monitoring.Ack
-	1, // 9: air_quality_monitoring.AirQualityMonitoring.ReceiveAggregatedData:output_type -> air_quality_monitoring.DataResponse
-	5, // [5:10] is the sub-list for method output_type
-	0, // [0:5] is the sub-list for method input_type
+	0, // 0: air_quality_monitoring.AirQualityMonitoring.SendDataToServer:input_type -> air_quality_monitoring.Data
+	0, // 1: air_quality_monitoring.AirQualityMonitoring.ReceiveDataFromServer:input_type -> air_quality_monitoring.Data
+	0, // 2: air_quality_monitoring.AirQualityMonitoring.CheckConnection:input_type -> air_quality_monitoring.Data
+	2, // 3: air_quality_monitoring.AirQualityMonitoring.SendDataToServer:output_type -> air_quality_monitoring.Ack
+	1, // 4: air_quality_monitoring.AirQualityMonitoring.ReceiveDataFromServer:output_type -> air_quality_monitoring.DataResponse
+	2, // 5: air_quality_monitoring.AirQualityMonitoring.CheckConnection:output_type -> air_quality_monitoring.Ack
+	3, // [3:6] is the sub-list for method output_type
+	0, // [0:3] is the sub-list for method input_type
 	0, // [0:0] is the sub-list for extension type_name
 	0, // [0:0] is the sub-list for extension extendee
 	0, // [0:0] is the sub-list for field type_name
