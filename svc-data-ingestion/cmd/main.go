@@ -19,30 +19,36 @@ import (
 
 func main() {
 	// Target service initialization
-	svcTargetAddress := os.Getenv("SVC_TARGET_ADD")
-	svcTargetPort := os.Getenv("SVC_TARGET_PORT")
+	svcTargetAddress := os.Getenv("SVC_TA_LO_STRG_ADDR")
+	svcTargetPort := os.Getenv("SVC_TA_LO_STRG_PORT")
 	targetSvc := &api.Service{
 		Address: svcTargetAddress,
 		Port:    svcTargetPort,
 	}
-	// Wait until the target service is reachable
-	for {
-		if err := targetSvc.ServiceReachable(); err == nil {
-			break
-		} else {
-			log.Printf("Service is not reachable: %v", err)
-			time.Sleep(3 * time.Second)
-		}
-	}
 
-	conn, err := grpc.NewClient(
-		targetSvc.Address+":"+targetSvc.Port,
-		grpc.WithTransportCredentials(insecure.NewCredentials()))
-	if err != nil {
-		log.Fatalf("did not connect to target service: %v", err)
-	}
+	var conn *grpc.ClientConn
+	var client pb.AirQualityMonitoringClient
+	go func() {
+		for {
+			if err := targetSvc.ServiceReachable(); err == nil {
+				var err error
+				conn, err = grpc.NewClient(
+					targetSvc.Address+":"+targetSvc.Port,
+					grpc.WithTransportCredentials(insecure.NewCredentials()))
+				if err != nil {
+					log.Printf("Failed to connect to target service: %v", err)
+					return
+				}
+				client = pb.NewAirQualityMonitoringClient(conn)
+				log.Printf("Connected to target service: %s:%s\n", targetSvc.Address, targetSvc.Port)
+				return
+			} else {
+				log.Printf("Target service is not reachable: %v", err)
+				time.Sleep(5 * time.Second)
+			}
+		}
+	}()
 	defer conn.Close()
-	log.Printf("Connected to target service: %s:%s\n", targetSvc.Address, targetSvc.Port)
 
 	metricList := &metric.Metric{
 		RttTimes:        make(map[string][]float64),
@@ -51,11 +57,9 @@ func main() {
 		SuccessCount:    make(map[string]int),
 	}
 
-	client := pb.NewAirQualityMonitoringClient(conn)
-
 	// Local service initialization
-	svcAddress := os.Getenv("SVC_LOCAL_ADD")
-	svcPort := os.Getenv("SVC_LOCAL_PORT")
+	svcAddress := os.Getenv("SVC_LO_INGST_ADDR")
+	svcPort := os.Getenv("SVC_LO_INGST_PORT")
 	localSvc := &api.Service{
 		Address: svcAddress,
 		Port:    svcPort,
@@ -80,10 +84,11 @@ func main() {
 		}
 	}()
 
-	metricPort := os.Getenv("METRIC_PORT")
+	metricAddr := os.Getenv("SVC_LO_INGST_METRIC_ADDR")
+	metricPort := os.Getenv("SVC_LO_INGST_METRIC_PORT")
 	http.HandleFunc("/metrics", metricList.IndexHandler())
 	http.HandleFunc("/metrics/rtt", metricList.RttHandler())
 	http.HandleFunc("/metrics/processing", metricList.ProcessingTimeHandler())
 	log.Printf("Starting server on :%s\n", metricPort)
-	log.Fatal(http.ListenAndServe(fmt.Sprintf(":%s", metricPort), nil))
+	log.Fatal(http.ListenAndServe(fmt.Sprintf("%s:%s", metricAddr, metricPort), nil))
 }

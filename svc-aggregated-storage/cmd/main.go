@@ -11,7 +11,8 @@ import (
 	api "github.com/etesami/air-quality-monitoring/api"
 	metric "github.com/etesami/air-quality-monitoring/pkg/metric"
 	pb "github.com/etesami/air-quality-monitoring/pkg/protoc"
-	internal "github.com/etesami/air-quality-monitoring/svc-local-storage/internal"
+
+	internal "github.com/etesami/air-quality-monitoring/svc-aggregated-storage/internal"
 
 	_ "github.com/mattn/go-sqlite3"
 	"google.golang.org/grpc"
@@ -19,27 +20,56 @@ import (
 
 func createTables(db *sql.DB) error {
 	// Create your tables here
-	query := `
-			CREATE TABLE IF NOT EXISTS air_quality (
-					id INTEGER PRIMARY KEY AUTOINCREMENT,
-					aqi INTEGER,
-  				idx INTEGER,
-  				timestamp DATETIME,
-  				attributions TEXT,
-  				city TEXT,
-  				dominentpol TEXT,
-  				forecast TEXT,
-  				iaqi TEXT,
-					status TEXT
-			);`
-	_, err := db.Exec(query)
-	return err
+	queries := []string{`
+		CREATE TABLE IF NOT EXISTS air_quality (
+				aqi INTEGER,
+				timestamp DATETIME,
+				dewPoint INTEGER,
+				humidity INTEGER,
+				pressure INTEGER,
+				temperature INTEGER,
+				windSpeed INTEGER,
+				windGust INTEGER,
+				pm25 INTEGER,
+				city_id INTEGER,
+				FOREIGN KEY (city_id) REFERENCES city(idx)
+		);`,
+		`CREATE TABLE IF NOT EXISTS city (
+				idx INTEGER PRIMARY KEY,
+				cityName TEXT,
+				lat REAL,
+				lng REAL
+		);`,
+		`CREATE TABLE IF NOT EXISTS alert (
+				hash TEXT PRIMARY KEY UNIQUE,
+				alertDesc TEXT,
+				alertEffective DATETIME,
+				alertExpires DATETIME,
+				alertStatus TEXT,
+				alertCertainty TEXT,
+				alertUrgency TEXT,
+				alertSeverity TEXT,
+				alertHeadline TEXT,
+				alertDescription TEXT,
+				alertEvent TEXT,
+				city_id INTEGER,
+    		FOREIGN KEY (city_id) REFERENCES city(idx)
+		);`,
+	}
+	for _, query := range queries {
+		_, err := db.Exec(query)
+		if err != nil {
+			log.Fatalf("Error executing query: %v", err)
+			return err
+		}
+	}
+	return nil
 }
 
 func main() {
 
-	svcAddress := os.Getenv("SVC_LO_STRG_ADDR")
-	svcPort := os.Getenv("SVC_LO_STRG_PORT")
+	svcAddress := os.Getenv("SVC_LO_AGGR_STRG_ADDR")
+	svcPort := os.Getenv("SVC_LO_AGGR_STRG_PORT")
 	thisSvc := &api.Service{
 		Address: svcAddress,
 		Port:    svcPort,
@@ -77,8 +107,8 @@ func main() {
 		}
 	}()
 
-	metricAddr := os.Getenv("SVC_LO_STRG_METRIC_ADDR")
-	metricPort := os.Getenv("SVC_LO_STRG_METRIC_PORT")
+	metricAddr := os.Getenv("SVC_LO_AG_STRG_METRIC_ADDR")
+	metricPort := os.Getenv("SVC_LO_AG_STRG_METRIC_PORT")
 	log.Printf("Starting metric server on :%s\n", metricPort)
 	http.HandleFunc("/metrics", metricList.IndexHandler())
 	http.HandleFunc("/metrics/rtt", metricList.RttHandler())

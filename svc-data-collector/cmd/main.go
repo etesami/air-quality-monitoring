@@ -24,11 +24,11 @@ func main() {
 	Lng1, err2 := strconv.ParseFloat(os.Getenv("LNG1"), 64)
 	Lat2, err3 := strconv.ParseFloat(os.Getenv("LAT2"), 64)
 	Lng2, err4 := strconv.ParseFloat(os.Getenv("LNG2"), 64)
-	token := os.Getenv("TOKEN")
 	if err1 != nil || err2 != nil || err3 != nil || err4 != nil {
 		log.Fatalf("Error parsing environment variables: %v, %v, %v, %v", err1, err2, err3, err4)
 	}
 
+	token := os.Getenv("TOKEN")
 	locData := &svcapi.LocationData{
 		Lat1:  Lat1,
 		Lng1:  Lng1,
@@ -37,8 +37,8 @@ func main() {
 		Token: token,
 	}
 
-	svcAddress := os.Getenv("SVC_TARGET_ADD")
-	svcPort := os.Getenv("SVC_TARGET_PORT")
+	svcAddress := os.Getenv("SVC_TA_INGESTION_ADDR")
+	svcPort := os.Getenv("SVC_TA_INGESTION_PORT")
 	svc := &api.Service{
 		Address: svcAddress,
 		Port:    svcPort,
@@ -48,17 +48,17 @@ func main() {
 		if err := svc.ServiceReachable(); err == nil {
 			break
 		} else {
-			log.Printf("Service is not reachable: %v", err)
+			log.Printf("Service [%s:%s] is not reachable: %v", svc.Address, svc.Port, err)
 			time.Sleep(3 * time.Second)
 		}
 	}
 
 	conn, err := grpc.NewClient(svc.Address+":"+svc.Port, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
-		log.Fatalf("did not connect: %v", err)
+		log.Fatalf("did not connect to [%s:%s]: %v", svc.Address, svc.Port, err)
 	}
 	defer conn.Close()
-	log.Printf("Connected to target service: %s:%s\n", svc.Address, svc.Port)
+	log.Printf("Connected to target service: [%s:%s]\n", svc.Address, svc.Port)
 
 	metricList := &metric.Metric{
 		RttTimes:        make(map[string][]float64),
@@ -66,12 +66,12 @@ func main() {
 		FailureCount:    make(map[string]int),
 		SuccessCount:    make(map[string]int),
 	}
-
 	client := pb.NewAirQualityMonitoringClient(conn)
 
 	// Call api evey 60 seconds
 	// TODO: Adjust the time
-	ticker := time.NewTicker(2 * time.Second)
+	ticker := time.NewTicker(5 * time.Second)
+	// ticker := time.NewTicker(10 * time.Minute)
 	defer ticker.Stop()
 
 	go func() {
@@ -79,15 +79,15 @@ func main() {
 			if err := internal.ProcessTicker(client, locData, metricList); err != nil {
 				log.Printf("Error during processing: %v", err)
 			}
-			// TODO: Remove the break
 			break
 		}
 	}()
 
-	metricPort := os.Getenv("METRIC_PORT")
+	metricAddr := os.Getenv("SVC_LO_COLC_METRIC_ADDR")
+	metricPort := os.Getenv("SVC_LO_COLC_METRIC_PORT")
 	http.HandleFunc("/metrics", metricList.IndexHandler())
 	http.HandleFunc("/metrics/rtt", metricList.RttHandler())
 	http.HandleFunc("/metrics/processing", metricList.ProcessingTimeHandler())
 	log.Printf("Starting server on :%s\n", metricPort)
-	log.Fatal(http.ListenAndServe(fmt.Sprintf(":%s", metricPort), nil))
+	log.Fatal(http.ListenAndServe(fmt.Sprintf("%s:%s", metricAddr, metricPort), nil))
 }

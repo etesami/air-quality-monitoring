@@ -11,6 +11,7 @@ import (
 
 	metric "github.com/etesami/air-quality-monitoring/pkg/metric"
 	pb "github.com/etesami/air-quality-monitoring/pkg/protoc"
+	utils "github.com/etesami/air-quality-monitoring/pkg/utils"
 	"github.com/etesami/air-quality-monitoring/svc-data-collector/api"
 )
 
@@ -87,7 +88,7 @@ func getLocationData(locationId, token string) (map[string]any, error) {
 
 // sendToDataIngestionService sends the data to the data ingestion service
 // It takes a gRPC client and the data to be sent as parameters
-func sendToDataIngestionService(client pb.AirQualityMonitoringClient, data any) (int64, error) {
+func sendToDataIngestionService(client pb.AirQualityMonitoringClient, data any) (float64, error) {
 
 	byteData, err := json.Marshal(data)
 	if err != nil {
@@ -105,11 +106,11 @@ func sendToDataIngestionService(client pb.AirQualityMonitoringClient, data any) 
 	if err != nil {
 		return -1, fmt.Errorf("send data not successful: %v", err)
 	}
-	if ack.Status != "ok" {
-		return -1, fmt.Errorf("ack status not expected: %s", ack.Status)
+	log.Printf("Sent [%d] bytes. Ack recevied.\n", len(byteData))
+	rtt, err := utils.CalculateRtt(sentTimestamp, time.Now(), *ack)
+	if err != nil {
+		return -1, fmt.Errorf("error calculating RTT: %v", err)
 	}
-	rtt := time.Since(sentTimestamp).Milliseconds()
-	log.Printf("Sent [%d] bytes. Ack recevied. RTT: [%d]ms\n", len(byteData), rtt)
 	return rtt, nil
 }
 
@@ -154,7 +155,8 @@ func ProcessTicker(client pb.AirQualityMonitoringClient, locData *api.LocationDa
 
 			rtt, err := sendToDataIngestionService(client, locationData["rxs"])
 			if err != nil {
-				log.Printf("Error: %v", err)
+				// TODO: Should check if the app should crash or it can continue and only log the error
+				log.Printf("Error sending data to ingestion service: %v", err)
 				m.Failure("toIngestion")
 			}
 			m.Sucess("toIngestion")
@@ -162,7 +164,7 @@ func ProcessTicker(client pb.AirQualityMonitoringClient, locData *api.LocationDa
 
 		}(locationId, metricList)
 	}
+
 	wg.Wait()
 	return nil
-
 }
