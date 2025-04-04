@@ -11,7 +11,6 @@ import (
 	api "github.com/etesami/air-quality-monitoring/api"
 	metric "github.com/etesami/air-quality-monitoring/pkg/metric"
 	pb "github.com/etesami/air-quality-monitoring/pkg/protoc"
-	svcapi "github.com/etesami/air-quality-monitoring/svc-data-collector/api"
 	internal "github.com/etesami/air-quality-monitoring/svc-data-collector/internal"
 
 	"google.golang.org/grpc"
@@ -29,7 +28,7 @@ func main() {
 	}
 
 	token := os.Getenv("TOKEN")
-	locData := &svcapi.LocationData{
+	locData := &internal.LocationData{
 		Lat1:  Lat1,
 		Lng1:  Lng1,
 		Lat2:  Lat2,
@@ -68,10 +67,14 @@ func main() {
 	}
 	client := pb.NewAirQualityMonitoringClient(conn)
 
-	// Call api evey 60 seconds
 	// TODO: Adjust the time
-	ticker := time.NewTicker(5 * time.Second)
-	// ticker := time.NewTicker(10 * time.Minute)
+	// ticker := time.NewTicker(5 * time.Second)
+	updateFrequencyStr := os.Getenv("SVC_LO_COLC_UPDATE_FREQUENCY")
+	updateFrequency, err := strconv.Atoi(updateFrequencyStr)
+	if err != nil {
+		log.Fatalf("Error parsing update frequency: %v", err)
+	}
+	ticker := time.NewTicker(time.Duration(updateFrequency) * time.Minute)
 	defer ticker.Stop()
 
 	go func() {
@@ -79,7 +82,6 @@ func main() {
 			if err := internal.ProcessTicker(client, locData, metricList); err != nil {
 				log.Printf("Error during processing: %v", err)
 			}
-			break
 		}
 	}()
 

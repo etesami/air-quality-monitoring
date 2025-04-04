@@ -5,6 +5,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strconv"
 	"time"
 
 	api "github.com/etesami/air-quality-monitoring/api"
@@ -52,9 +53,14 @@ func main() {
 	log.Printf("Connected to target [aggregated storage] service: %s:%s\n", targetAggrSvc.Address, targetAggrSvc.Port)
 	clientAggr := pb.NewAirQualityMonitoringClient(connAggr)
 
-	go func(m *metric.Metric, clientAggr pb.AirQualityMonitoringClient) {
+	updateFrequencyStr := os.Getenv("SVC_LO_DASH_UPDATE_FREQUENCY")
+	updateFrequency, err := strconv.Atoi(updateFrequencyStr)
+	if err != nil {
+		log.Fatalf("Error parsing update frequency: %v", err)
+	}
+	go func(m *metric.Metric, clientAggr pb.AirQualityMonitoringClient, u int) {
 		// Target local storage service initialization
-		ticker := time.NewTicker(20 * time.Second)
+		ticker := time.NewTicker(time.Duration(u) * time.Second)
 		defer ticker.Stop()
 
 		for range ticker.C {
@@ -63,7 +69,7 @@ func main() {
 			}
 		}
 
-	}(m, clientAggr)
+	}(m, clientAggr, updateFrequency)
 
 	metricAddr := os.Getenv("SVC_LO_DASH_METRIC_ADDR")
 	metricPort := os.Getenv("SVC_LO_DASH_METRIC_PORT")

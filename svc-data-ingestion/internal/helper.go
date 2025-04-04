@@ -8,8 +8,6 @@ import (
 	"strconv"
 	"time"
 
-	// "k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-
 	api "github.com/etesami/air-quality-monitoring/api"
 	metric "github.com/etesami/air-quality-monitoring/pkg/metric"
 	pb "github.com/etesami/air-quality-monitoring/pkg/protoc"
@@ -110,7 +108,8 @@ func sendDataToStorage(client pb.AirQualityMonitoringClient, d *api.AirQualityDa
 		return -1, fmt.Errorf("ack status not expected: %s", ack.Status)
 	}
 	log.Printf("Sent [%d] bytes. Ack recevied.\n", len(byteData))
-	rtt, err := utils.CalculateRtt(sentTimestamp, time.Now(), *ack)
+
+	rtt, err := utils.CalculateRtt(sentTimestamp, ack.ReceivedTimestamp, time.Now(), ack.AckSentTimestamp)
 	if err != nil {
 		return -1, fmt.Errorf("error calculating RTT: %v", err)
 	}

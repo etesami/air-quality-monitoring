@@ -32,12 +32,14 @@ func (s Server) ReceiveDataFromLocalStorage(ctx context.Context, req *pb.Data) (
 	var dataRequest localapi.DataRequest
 	if err := json.Unmarshal([]byte(req.Payload), &dataRequest); err != nil {
 		log.Printf("Error unmarshalling JSON: %v", err)
+		s.Metric.Failure("localStorage")
 		return nil, err
 	}
 
 	dataToBeSent, err := requestDataFromDb(s.Db, &dataRequest)
 	if err != nil {
 		log.Printf("Error requesting data: %v", err)
+		s.Metric.Failure("localStorage")
 		return nil, err
 	}
 	if dataToBeSent == "" {
@@ -49,6 +51,8 @@ func (s Server) ReceiveDataFromLocalStorage(ctx context.Context, req *pb.Data) (
 			SentTimestamp:     fmt.Sprintf("%d", int(time.Now().UnixMilli())),
 		}, nil
 	}
+	s.Metric.Sucess("localStorage")
+	s.Metric.AddProcessingTime("localStorage", float64(time.Since(receivedTime).Milliseconds())/1000.0)
 
 	res := &pb.DataResponse{
 		Status:            "ok",

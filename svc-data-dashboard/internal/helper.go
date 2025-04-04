@@ -12,10 +12,11 @@ import (
 
 	"github.com/etesami/air-quality-monitoring/pkg/metric"
 	pb "github.com/etesami/air-quality-monitoring/pkg/protoc"
+	utils "github.com/etesami/air-quality-monitoring/pkg/utils"
 )
 
 // requestNewData requests new data from the local storage service
-func requestNewData(client pb.AirQualityMonitoringClient) (int64, string, error) {
+func requestNewData(client pb.AirQualityMonitoringClient) (float64, string, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
@@ -35,13 +36,13 @@ func requestNewData(client pb.AirQualityMonitoringClient) (int64, string, error)
 	if err != nil {
 		return -1, "", fmt.Errorf("error requesting data from local storage: %v", err)
 	}
-	rtt := time.Since(sentTimestamp).Milliseconds()
 
+	rtt, err := utils.CalculateRtt(sentTimestamp, res.ReceivedTimestamp, time.Now(), res.SentTimestamp)
 	if len(res.Payload) == 0 {
-		log.Printf("No data received from local storage. RTT: [%d]ms\n", rtt)
+		log.Printf("No data received from local storage. RTT: [%f]ms\n", rtt)
 		return rtt, "", nil
 	}
-	log.Printf("Response from local storage recevied. RTT: [%d]ms, len: [%d]\n", rtt, len(res.Payload))
+	log.Printf("Response from local storage recevied. RTT: [%f]ms, len: [%d]\n", rtt, len(res.Payload))
 
 	return rtt, res.Payload, nil
 }
@@ -49,22 +50,27 @@ func requestNewData(client pb.AirQualityMonitoringClient) (int64, string, error)
 // processTicker processes the ticker event
 // fetch data from the aggregated storage service in fixed intervals and show some statistics
 func ProcessTicker(clientLocal, clientAggr pb.AirQualityMonitoringClient, m *metric.Metric) error {
-	// TODO: think about the rtt, this time includes the processing time of the remote service
-	_, recData, err := requestNewData(clientLocal)
+	rtt, recData, err := requestNewData(clientLocal)
 	if err != nil {
 		log.Printf("Error requesting new data: %v", err)
+		m.Failure("fromAggregatedStorage")
 		return err
 	}
+	m.AddRttTime("fromAggregatedStorage", rtt)
 	if len(recData) == 0 {
 		log.Printf("No data received from local storage service")
 		return nil
 	}
 
+	sProcssTime := time.Now()
 	dataRes := []agapi.EnhancedResponse{}
 	if err := json.Unmarshal([]byte(recData), &dataRes); err != nil {
 		log.Printf("Error unmarshalling JSON: %v", err)
+		m.Failure("processing")
 		return err
 	}
+	m.Sucess("processing")
+	m.AddProcessingTime("processing", time.Since(sProcssTime).Seconds())
 	log.Printf("Received [%d] items.", len(dataRes))
 	return nil
 

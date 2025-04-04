@@ -12,19 +12,20 @@ import (
 	"github.com/etesami/air-quality-monitoring/api"
 	"github.com/etesami/air-quality-monitoring/pkg/metric"
 	pb "github.com/etesami/air-quality-monitoring/pkg/protoc"
+	utils "github.com/etesami/air-quality-monitoring/pkg/utils"
 
 	dpapi "github.com/etesami/air-quality-monitoring/api/data-processing"
 	loapi "github.com/etesami/air-quality-monitoring/api/local-storage"
 )
 
 // requestNewData requests new data from the local storage service
-func requestNewData(ctx context.Context, client pb.AirQualityMonitoringClient) (int64, string, error) {
+func requestNewData(ctx context.Context, client pb.AirQualityMonitoringClient) (float64, string, error) {
 	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 
+	var startTime string
 	// Check context if we have a last call time
 	// If so, use that as the start time
-	var startTime string
 	endTime := time.Now().Add(1 * time.Hour).Format(time.RFC3339)
 	if lastCall := ctx.Value("lastCall"); lastCall != nil {
 		sTime := lastCall.(time.Time)
@@ -51,12 +52,12 @@ func requestNewData(ctx context.Context, client pb.AirQualityMonitoringClient) (
 	if err != nil {
 		return -1, "", fmt.Errorf("error requesting data from local storage: %v", err)
 	}
-	rtt := time.Since(sentTimestamp).Milliseconds()
+	rtt, err := utils.CalculateRtt(sentTimestamp, res.ReceivedTimestamp, time.Now(), res.SentTimestamp)
 	if len(res.Payload) == 0 {
-		log.Printf("No data received from local storage. RTT: [%d]ms\n", rtt)
+		log.Printf("No data received from local storage. RTT: [%f]ms\n", rtt)
 		return rtt, "", nil
 	}
-	log.Printf("Response from local storage recevied. RTT: [%d]ms, len: [%d]\n", rtt, len(res.Payload))
+	log.Printf("Response from local storage recevied. RTT: [%f]ms, len: [%d]\n", rtt, len(res.Payload))
 	return rtt, res.Payload, nil
 }
 
@@ -191,7 +192,7 @@ func generateAlertStruct(res map[string]any) (*dpapi.AlertRaw, error) {
 }
 
 // sendDataToStorage sends the processed data to the storage service
-func sendDataToStorage(client pb.AirQualityMonitoringClient, data string) (int64, error) {
+func sendDataToStorage(client pb.AirQualityMonitoringClient, data string) (float64, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
@@ -206,28 +207,35 @@ func sendDataToStorage(client pb.AirQualityMonitoringClient, data string) (int64
 	if ack.Status != "ok" {
 		return -1, fmt.Errorf("ack status not expected: %s", ack.Status)
 	}
-	rtt := time.Since(sentTimestamp).Milliseconds()
-	log.Printf("Sent [%d] bytes to local storage. Ack recevied. RTT: [%d]ms\n", len(data), rtt)
+	rtt, err := utils.CalculateRtt(sentTimestamp, ack.ReceivedTimestamp, time.Now(), ack.AckSentTimestamp)
+	if err != nil {
+		return -1, fmt.Errorf("error calculating RTT: %v", err)
+	}
+	log.Printf("Sent [%d] bytes to local storage. Ack recevied. RTT: [%f]ms\n", len(data), rtt)
 	return rtt, nil
 }
 
 // processTicker processes the ticker event
 func ProcessTicker(ctx context.Context, clientLocal, clientAggr pb.AirQualityMonitoringClient, m *metric.Metric) error {
-	// TODO: think about the rtt, this time includes the processing time of the remote service
-	_, recData, err := requestNewData(ctx, clientLocal)
+	rtt, recData, err := requestNewData(ctx, clientLocal)
 	if err != nil {
 		log.Printf("Error requesting new data: %v", err)
+		m.Failure("fromLocalStorage")
 		return err
 	}
 	if len(recData) == 0 {
 		log.Printf("No data received from local storage service")
+		m.AddRttTime("fromLocalStorage", rtt)
 		return nil
 	}
 
+	s := time.Now()
 	processedData, err := processData(recData)
 	if err != nil {
 		log.Printf("Error processing data: %v", err)
+		m.Failure("processing")
 	}
+
 	if len(processedData) == 0 {
 		log.Printf("No data to be sent to aggregated storage")
 		return nil
@@ -238,13 +246,17 @@ func ProcessTicker(ctx context.Context, clientLocal, clientAggr pb.AirQualityMon
 	if err != nil {
 		log.Printf("Error marshalling processed data: %v", err)
 	}
+	m.Sucess("processing")
+	m.AddProcessingTime("processing", float64(time.Since(s).Milliseconds())/1000.0)
 
-	go func(d string) {
-		// TODO: handle RTT
-		if _, err := sendDataToStorage(clientAggr, d); err != nil {
+	go func(d string, m *metric.Metric) {
+		rtt, err := sendDataToStorage(clientAggr, d)
+		if err != nil {
 			log.Printf("Error sending data to storage: %v", err)
 		}
-	}(string(procResBytes))
+		m.AddRttTime("toAggregatedStorage", rtt)
+		m.Sucess("toAggregatedStorage")
+	}(string(procResBytes), m)
 
 	return nil
 }

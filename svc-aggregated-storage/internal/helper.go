@@ -50,6 +50,8 @@ func (s Server) ReceiveAggregatedData(ctx context.Context, req *pb.Data) (*pb.Da
 			SentTimestamp:     fmt.Sprintf("%d", int(time.Now().UnixMilli())),
 		}, nil
 	}
+	s.Metric.Sucess("processing")
+	s.Metric.AddProcessingTime("processing", float64(time.Since(receivedTime).Milliseconds())/1000.0)
 
 	res := &pb.DataResponse{
 		Status:            "ok",
@@ -69,18 +71,18 @@ func (s Server) SendToAggregatedStorage(ctx context.Context, recData *pb.Data) (
 		aqData := []dpapi.EnhancedDataResponse{}
 		if err := json.Unmarshal([]byte(recData.Payload), &aqData); err != nil {
 			log.Printf("Error unmarshalling JSON: %v", err)
-			m.Failure("localStorage")
+			m.Failure("processing")
 			return
 		}
 
 		// Insert data into the database
 		if err := insertToDb(db, aqData); err != nil {
 			log.Printf("Error inserting data into database: %v", err)
-			m.Failure("localStorage")
+			m.Failure("processing")
 			return
 		}
-		m.Sucess("localStorage")
-		m.AddProcessingTime("localStorage", float64(time.Since(start).Milliseconds())/1000.0)
+		m.Sucess("processing")
+		m.AddProcessingTime("processing", float64(time.Since(start).Milliseconds())/1000.0)
 	}(recData.Payload, s.Db, s.Metric, receivedTime)
 
 	ack := &pb.Ack{

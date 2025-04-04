@@ -12,8 +12,37 @@ import (
 	metric "github.com/etesami/air-quality-monitoring/pkg/metric"
 	pb "github.com/etesami/air-quality-monitoring/pkg/protoc"
 	utils "github.com/etesami/air-quality-monitoring/pkg/utils"
-	"github.com/etesami/air-quality-monitoring/svc-data-collector/api"
 )
+
+type LocationData struct {
+	Lat1  float64 `json:"lat1"`
+	Lng1  float64 `json:"lng1"`
+	Lat2  float64 `json:"lat2"`
+	Lng2  float64 `json:"lng2"`
+	Token string  `json:"token"`
+}
+
+func (l *LocationData) collectLocationsIds() (map[string]any, error) {
+	url := fmt.Sprintf(
+		"https://api.waqi.info/v2/map/bounds?latlng=%f,%f,%f,%f&token=%s",
+		l.Lat1, l.Lng1, l.Lat2, l.Lng2, l.Token)
+
+	resp, err := http.Get(url)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch data: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != 200 {
+		return nil, fmt.Errorf("failed to fetch data: %d", resp.StatusCode)
+	}
+
+	var res map[string]any
+	if err := json.NewDecoder(resp.Body).Decode(&res); err != nil {
+		return nil, fmt.Errorf("error Decoding JSON: %v", err)
+	}
+	return res, nil
+}
 
 // validateData validates the fetched data and ensures it
 // contains the status and data fields
@@ -107,16 +136,18 @@ func sendToDataIngestionService(client pb.AirQualityMonitoringClient, data any) 
 		return -1, fmt.Errorf("send data not successful: %v", err)
 	}
 	log.Printf("Sent [%d] bytes. Ack recevied.\n", len(byteData))
-	rtt, err := utils.CalculateRtt(sentTimestamp, time.Now(), *ack)
+
+	rtt, err := utils.CalculateRtt(sentTimestamp, ack.ReceivedTimestamp, time.Now(), ack.AckSentTimestamp)
 	if err != nil {
 		return -1, fmt.Errorf("error calculating RTT: %v", err)
 	}
+
 	return rtt, nil
 }
 
 // processTicker processes the ticker event
-func ProcessTicker(client pb.AirQualityMonitoringClient, locData *api.LocationData, metricList *metric.Metric) error {
-	data, err := locData.CollectLocationsIds()
+func ProcessTicker(client pb.AirQualityMonitoringClient, locData *LocationData, metricList *metric.Metric) error {
+	data, err := locData.collectLocationsIds()
 	if err != nil {
 		return fmt.Errorf("fetching data: %w", err)
 	}
