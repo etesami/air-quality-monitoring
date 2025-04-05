@@ -12,8 +12,6 @@ import (
 type Metric struct {
 	RttTimes        map[string][]float64 `json:"rtt_times"`
 	ProcessingTimes map[string][]float64 `json:"processing_times"`
-	FailureCount    map[string]int       `json:"failure_count"`
-	SuccessCount    map[string]int       `json:"success_count"`
 	mu              sync.Mutex
 }
 
@@ -39,30 +37,6 @@ func (m *Metric) AddRttTime(s string, time float64) {
 		m.RttTimes[s] = []float64{}
 	}
 	m.RttTimes[s] = append(m.RttTimes[s], time)
-}
-
-func (m *Metric) Sucess(s string) {
-	m.lock()
-	defer m.unlock()
-	if m.SuccessCount == nil {
-		m.SuccessCount = make(map[string]int)
-	}
-	if _, ok := m.SuccessCount[s]; !ok {
-		m.SuccessCount[s] = 0
-	}
-	m.SuccessCount[s]++
-}
-
-func (m *Metric) Failure(s string) {
-	m.lock()
-	defer m.unlock()
-	if m.FailureCount == nil {
-		m.FailureCount = make(map[string]int)
-	}
-	if _, ok := m.FailureCount[s]; !ok {
-		m.FailureCount[s] = 0
-	}
-	m.FailureCount[s]++
 }
 
 func (m *Metric) lock() {
@@ -169,14 +143,6 @@ func (m *Metric) Count(s string, t string) int {
 	return len(m.ProcessingTimes[s])
 }
 
-func (m *Metric) SuccessRate(s string) int {
-	return m.SuccessCount[s] * 100 / (m.SuccessCount[s] + m.FailureCount[s])
-}
-
-func (m *Metric) FailureRate(s string) int {
-	return m.FailureCount[s] * 100 / (m.SuccessCount[s] + m.FailureCount[s])
-}
-
 // metricRttHandler handles the /metrics/rtt endpoint
 func (m *Metric) RttHandler() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -211,7 +177,7 @@ func (m *Metric) IndexHandler() http.HandlerFunc {
 		}
 		sort.Strings(services)
 		metrics := []string{"rtt", "processing"}
-		types := []string{"mean", "max", "min", "success_rate", "failure_rate", "count", "stddev", "variance", "percentiles"}
+		types := []string{"mean", "max", "min", "count", "stddev", "variance", "percentiles"}
 		sort.Strings(types)
 
 		w.Header().Set("Content-Type", "application/json")
@@ -245,6 +211,14 @@ func (m *Metric) ProcessingTimeHandler() http.HandlerFunc {
 }
 
 func buildResponse(s string, tName string, t any) map[string]any {
+	if slice, ok := t.([]float64); ok {
+		return map[string]any{
+			"service": s,
+			"metrics": map[string]any{
+				tName: slice,
+			},
+		}
+	}
 	return map[string]any{
 		"service": s,
 		"metrics": map[string]any{
@@ -263,10 +237,6 @@ func (m *Metric) metricHandler(s string, metricType string, queryType string) (a
 		response = buildResponse(s, "max", m.MaxTime(s, metricType))
 	case "min":
 		response = buildResponse(s, "min", m.MinTime(s, metricType))
-	case "success_rate":
-		response = buildResponse(s, "success_rate", m.SuccessRate(s))
-	case "failure_rate":
-		response = buildResponse(s, "failure_rate", m.FailureRate(s))
 	case "count":
 		response = buildResponse(s, "count", m.Count(s, metricType))
 	case "stddev":
@@ -277,18 +247,17 @@ func (m *Metric) metricHandler(s string, metricType string, queryType string) (a
 		percentiles := []float64{25, 50, 75, 90, 95, 99}
 		response = buildResponse(s, "percentiles", m.Percentiles(s, metricType, percentiles))
 	case "all":
+		// TODO: Fix precentiles
+		// prc := m.Percentiles(s, metricType, []float64{25, 50, 75, 90, 95, 99})
 		response = map[string]any{
 			"service": s,
 			"metrics": map[string]any{
-				"mean":         m.Mean(s, metricType),
-				"max":          m.MaxTime(s, metricType),
-				"min":          m.MinTime(s, metricType),
-				"success_rate": m.SuccessRate(s),
-				"failure_rate": m.FailureRate(s),
-				"count":        m.Count(s, metricType),
-				"stddev":       m.StdDev(s, metricType),
-				"variance":     m.Variance(s, metricType),
-				"percentiles":  m.Percentiles(s, metricType, []float64{25, 50, 75, 90, 95, 99}),
+				"mean":     m.Mean(s, metricType),
+				"max":      m.MaxTime(s, metricType),
+				"min":      m.MinTime(s, metricType),
+				"count":    m.Count(s, metricType),
+				"stddev":   m.StdDev(s, metricType),
+				"variance": m.Variance(s, metricType),
 			},
 		}
 	default:

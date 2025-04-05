@@ -3,21 +3,16 @@ option go_package = "github.com/etesami/air-quality-monitoring/protoc";
 package air_quality_monitoring;
 
 service AirQualityMonitoring {
-    // A simple RPC to send data to the ingestion service
+    // A simple RPC to send data to the server
     // and receive an acknowledgment
-    rpc SendDataToIngsetion(Data) returns (Ack);
-    
-    // A simple RPC to send data to the storage service
-    // and receive an acknowledgment
-    rpc SendDataToStorage(Data) returns (Ack);
+    rpc SendDataToServer(Data) returns (Ack);
 
     // A simple RPC to request data from the local storage
-    rpc ReceiveDataFromLocalStorage(Data) returns (DataResponse);
-    // A simple RPC to send data to the aggregated storage service
-    rpc SendToAggregatedStorage(Data) returns (Ack);
-    
-    // A simple RPC to request data from the aggregated storage
-    rpc ReceiveAggregatedData(Data) returns (DataResponse);
+    rpc ReceiveDataFromServer(Data) returns (DataResponse);
+
+    // A simple RPC to send a ping to the service and receive a pong primarily for 
+    // testing the connection and latency
+    rpc CheckConnection(Data) returns (Ack);
 }
 
 message Data {
