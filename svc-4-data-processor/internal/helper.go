@@ -229,9 +229,13 @@ func sendDataToStorage(client pb.AirQualityMonitoringClient, data string) error 
 }
 
 // processTicker processes the ticker event
-func ProcessTicker(ctx context.Context, client pb.AirQualityMonitoringClient, serverName string, m *metric.Metric) error {
+func ProcessTicker(client *pb.AirQualityMonitoringClient, serverName string, m *metric.Metric) error {
+	if *client == nil {
+		log.Printf("Client is not ready yet")
+		return nil
+	}
 	go func(m *metric.Metric) {
-		pong, err := client.CheckConnection(context.Background(), &pb.Data{
+		pong, err := (*client).CheckConnection(context.Background(), &pb.Data{
 			Payload:       "ping",
 			SentTimestamp: fmt.Sprintf("%d", int(time.Now().UnixMilli())),
 		})

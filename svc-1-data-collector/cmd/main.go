@@ -62,13 +62,14 @@ func main() {
 	metricList := &metric.Metric{
 		RttTimes:        make(map[string][]float64),
 		ProcessingTimes: make(map[string][]float64),
-		FailureCount:    make(map[string]int),
-		SuccessCount:    make(map[string]int),
 	}
 	client := pb.NewAirQualityMonitoringClient(conn)
 
-	// TODO: Adjust the time
-	// ticker := time.NewTicker(5 * time.Second)
+	// First call to processTicker
+	if err := internal.ProcessTicker(&client, "ingestor", locData, metricList); err != nil {
+		log.Printf("Error during processing: %v", err)
+	}
+
 	updateFrequencyStr := os.Getenv("SVC_LO_COLC_UPDATE_FREQUENCY")
 	updateFrequency, err := strconv.Atoi(updateFrequencyStr)
 	if err != nil {
@@ -77,13 +78,13 @@ func main() {
 	ticker := time.NewTicker(time.Duration(updateFrequency) * time.Minute)
 	defer ticker.Stop()
 
-	go func() {
+	go func(c *pb.AirQualityMonitoringClient, metricList *metric.Metric) {
 		for range ticker.C {
-			if err := internal.ProcessTicker(client, "ingestor", locData, metricList); err != nil {
+			if err := internal.ProcessTicker(c, "ingestor", locData, metricList); err != nil {
 				log.Printf("Error during processing: %v", err)
 			}
 		}
-	}()
+	}(&client, metricList)
 
 	metricAddr := os.Getenv("SVC_LO_COLC_METRIC_ADDR")
 	metricPort := os.Getenv("SVC_LO_COLC_METRIC_PORT")

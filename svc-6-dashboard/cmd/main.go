@@ -22,8 +22,6 @@ func main() {
 	m := &metric.Metric{
 		RttTimes:        make(map[string][]float64),
 		ProcessingTimes: make(map[string][]float64),
-		FailureCount:    make(map[string]int),
-		SuccessCount:    make(map[string]int),
 	}
 
 	// Aggregated storage service initialization
@@ -58,12 +56,18 @@ func main() {
 	}()
 	defer conn.Close()
 
+	// First call to processTicker
+	if err := internal.ProcessTicker(&client, m); err != nil {
+		log.Printf("Error during processing: %v", err)
+	}
+
 	updateFrequencyStr := os.Getenv("SVC_LO_DASH_UPDATE_FREQUENCY")
 	updateFrequency, err := strconv.Atoi(updateFrequencyStr)
 	if err != nil {
 		log.Fatalf("Error parsing update frequency: %v", err)
 	}
-	go func(m *metric.Metric, c pb.AirQualityMonitoringClient, u int) {
+
+	go func(m *metric.Metric, c *pb.AirQualityMonitoringClient, u int) {
 		// Target local storage service initialization
 		ticker := time.NewTicker(time.Duration(u) * time.Second)
 		defer ticker.Stop()
@@ -74,7 +78,7 @@ func main() {
 			}
 		}
 
-	}(m, client, updateFrequency)
+	}(m, &client, updateFrequency)
 
 	metricAddr := os.Getenv("SVC_LO_DASH_METRIC_ADDR")
 	metricPort := os.Getenv("SVC_LO_DASH_METRIC_PORT")

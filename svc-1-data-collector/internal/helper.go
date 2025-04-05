@@ -141,10 +141,14 @@ func sendToDataIngestionService(client pb.AirQualityMonitoringClient, data any) 
 }
 
 // processTicker processes the ticker event
-func ProcessTicker(client pb.AirQualityMonitoringClient, serverName string, locData *LocationData, metricList *metric.Metric) error {
+func ProcessTicker(client *pb.AirQualityMonitoringClient, serverName string, locData *LocationData, metricList *metric.Metric) error {
 
 	go func(m *metric.Metric) {
-		pong, err := client.CheckConnection(context.Background(), &pb.Data{
+		if *client == nil {
+			log.Printf("Client is not ready yet")
+			return
+		}
+		pong, err := (*client).CheckConnection(context.Background(), &pb.Data{
 			Payload:       "ping",
 			SentTimestamp: fmt.Sprintf("%d", int(time.Now().UnixMilli())),
 		})
@@ -167,25 +171,24 @@ func ProcessTicker(client pb.AirQualityMonitoringClient, serverName string, locD
 		return fmt.Errorf("fetching data: %w", err)
 	}
 
-	// processing time starts
-	var processingTime time.Duration
+	var pTime int64
 	st := time.Now()
+
 	if err := validateDataLocIds(data); err != nil {
 		return fmt.Errorf("validating data: %w", err)
 	}
-
 	locationIds, err := getLocationIds(data)
 	if err != nil {
 		return fmt.Errorf("getting location IDs: %w", err)
 	}
 	log.Printf("Received [%d] location IDs. \n", len(locationIds))
-	processingTime = time.Since(st)
+	pTime = time.Since(st).Milliseconds()
 
 	var wg sync.WaitGroup
 	for _, locationId := range locationIds {
 
 		wg.Add(1)
-		go func(locationId string, m *metric.Metric, pt time.Duration) {
+		go func(locationId string, m *metric.Metric, pt int64) {
 			defer wg.Done()
 
 			locationData, err := getLocationData(locationId, locData.Token)
@@ -199,14 +202,14 @@ func ProcessTicker(client pb.AirQualityMonitoringClient, serverName string, locD
 				log.Printf("Error validating location data for ID %s: %v", locationId, err)
 				return
 			}
-			pt += time.Since(st)
-			m.AddProcessingTime("collector", float64(pt)/1000.0)
+			pt += time.Since(st).Milliseconds()
+			m.AddProcessingTime("processing", float64(pt)/1000.0)
 
-			if err := sendToDataIngestionService(client, locationData["rxs"]); err != nil {
+			if err := sendToDataIngestionService(*client, locationData["rxs"]); err != nil {
 				log.Printf("Error sending data to ingestion service: %v", err)
 			}
 
-		}(locationId, metricList, processingTime)
+		}(locationId, metricList, pTime)
 	}
 
 	wg.Wait()

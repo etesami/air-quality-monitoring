@@ -47,10 +47,13 @@ func requestNewData(client pb.AirQualityMonitoringClient) (string, error) {
 
 // processTicker processes the ticker event
 // fetch data from the aggregated storage service in fixed intervals and show some statistics
-func ProcessTicker(clientAggr pb.AirQualityMonitoringClient, m *metric.Metric) error {
-
+func ProcessTicker(client *pb.AirQualityMonitoringClient, m *metric.Metric) error {
+	if *client == nil {
+		log.Printf("Client is not ready yet")
+		return nil
+	}
 	go func(m *metric.Metric) {
-		pong, err := clientAggr.CheckConnection(context.Background(), &pb.Data{
+		pong, err := (*client).CheckConnection(context.Background(), &pb.Data{
 			Payload:       "ping",
 			SentTimestamp: fmt.Sprintf("%d", int(time.Now().UnixMilli())),
 		})
@@ -67,7 +70,7 @@ func ProcessTicker(clientAggr pb.AirQualityMonitoringClient, m *metric.Metric) e
 		log.Printf("RTT to ingestion service: [%.2f] ms\n", float64(rtt)/1000.0)
 	}(m)
 
-	recData, err := requestNewData(clientAggr)
+	recData, err := requestNewData(*client)
 	if err != nil {
 		return fmt.Errorf("error requesting new data: %v", err)
 	}
