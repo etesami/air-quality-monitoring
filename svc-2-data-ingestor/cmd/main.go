@@ -54,8 +54,6 @@ func main() {
 	metricList := &metric.Metric{
 		RttTimes:        make(map[string][]float64),
 		ProcessingTimes: make(map[string][]float64),
-		FailureCount:    make(map[string]int),
-		SuccessCount:    make(map[string]int),
 	}
 
 	// Local service initialization
@@ -85,6 +83,11 @@ func main() {
 		}
 	}()
 
+	// First call to processTicker
+	if err := internal.ProcessTicker(&clientStrg, "local-storage", metricList); err != nil {
+		log.Printf("Error during processing: %v", err)
+	}
+
 	// Set up a ticker to periodically call the gRPC server to measure the RTT
 	updateFrequencyStr := os.Getenv("SVC_LO_INGST_UPDATE_FREQUENCY")
 	updateFrequency, err := strconv.Atoi(updateFrequencyStr)
@@ -94,13 +97,13 @@ func main() {
 	ticker := time.NewTicker(time.Duration(updateFrequency) * time.Minute)
 	defer ticker.Stop()
 
-	go func() {
+	go func(m *metric.Metric, c *pb.AirQualityMonitoringClient) {
 		for range ticker.C {
-			if err := internal.ProcessTicker(clientStrg, "local-storage", metricList); err != nil {
+			if err := internal.ProcessTicker(c, "local-storage", m); err != nil {
 				log.Printf("Error during processing: %v", err)
 			}
 		}
-	}()
+	}(metricList, &clientStrg)
 
 	metricAddr := os.Getenv("SVC_LO_INGST_METRIC_ADDR")
 	metricPort := os.Getenv("SVC_LO_INGST_METRIC_PORT")

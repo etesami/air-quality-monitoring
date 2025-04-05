@@ -68,6 +68,8 @@ func (s Server) SendDataToServer(ctx context.Context, recData *pb.Data) (*pb.Ack
 func requestDataFromDb(db *sql.DB, t time.Time) ([]api.Msg, error) {
 	msgList := make([]localapi.DataResponse, 0)
 
+	log.Printf("Requesting data from the database after [%s]\n", t.Format("2006-01-02 15:04:05"))
+
 	rows, err := db.Query("SELECT * FROM air_quality WHERE timestamp > $1", t)
 	if err != nil {
 		return nil, err
@@ -167,6 +169,7 @@ func insertToAirQualityDb(db *sql.DB, data api.AirQualityData) error {
 		return err
 	}
 
+	count := 0
 	for _, obs := range data.Obs {
 		// If any error occurs, we return error and do not continue
 		// with the rest of the observation
@@ -189,7 +192,7 @@ func insertToAirQualityDb(db *sql.DB, data api.AirQualityData) error {
 			return err
 		}
 		if !newer {
-			log.Printf("Data is not newer than the latest record, skipping insertion")
+			// log.Printf("Data is not newer than the latest record, skipping insertion")
 			continue
 		}
 
@@ -214,18 +217,24 @@ func insertToAirQualityDb(db *sql.DB, data api.AirQualityData) error {
 			tx.Rollback()
 			return err
 		}
+		count++
 		log.Printf("Inserted data into the database: [%s]", obs.Msg.Time.ISO)
 	}
 
-	log.Printf("Inserted [%d] items in total.", len(data.Obs))
+	if count > 0 {
+		log.Printf("Inserted [%d]/[%d] items in total.", count, len(data.Obs))
+	}
 	return tx.Commit()
 }
 
 // processTicker processes the ticker event
-func ProcessTicker(ctx context.Context, client pb.AirQualityMonitoringClient, db *sql.DB, serverName string, metricList *metric.Metric) error {
-
+func ProcessTicker(ctx context.Context, client *pb.AirQualityMonitoringClient, db *sql.DB, serverName string, metricList *metric.Metric) error {
+	if *client == nil {
+		log.Printf("Client is not ready yet")
+		return nil
+	}
 	go func(m *metric.Metric) {
-		pong, err := client.CheckConnection(context.Background(), &pb.Data{
+		pong, err := (*client).CheckConnection(context.Background(), &pb.Data{
 			Payload:       "ping",
 			SentTimestamp: fmt.Sprintf("%d", int(time.Now().UnixMilli())),
 		})
@@ -274,7 +283,7 @@ func ProcessTicker(ctx context.Context, client pb.AirQualityMonitoringClient, db
 		}
 		metricList.AddProcessingTime("processing", float64(time.Since(st).Milliseconds())/1000.0)
 
-		_, err := client.SendDataToServer(context.Background(), res)
+		_, err := (*client).SendDataToServer(context.Background(), res)
 		if err != nil {
 			return fmt.Errorf("Error sending data to server: %v", err)
 		}

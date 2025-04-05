@@ -34,7 +34,7 @@ func (s Server) CheckConnection(ctx context.Context, recData *pb.Data) (*pb.Ack,
 
 func (s Server) SendDataToServer(ctx context.Context, recData *pb.Data) (*pb.Ack, error) {
 	st := time.Now()
-	ReceivedTimestamp := st.UnixMilli()
+	recTimestamp := st.UnixMilli()
 	log.Printf("Received at [%s]: [%d]\n", st.Format("2006-01-02 15:04:05"), len(recData.Payload))
 
 	go func(payload string, st time.Time) {
@@ -43,7 +43,6 @@ func (s Server) SendDataToServer(ctx context.Context, recData *pb.Data) (*pb.Ack
 		data := &api.AirQualityData{}
 		if err := json.Unmarshal([]byte(payload), &data); err != nil {
 			log.Printf("Error unmarshalling JSON: %v", err)
-			s.Metric.Failure("ingestion")
 			return
 		}
 
@@ -85,7 +84,7 @@ func (s Server) SendDataToServer(ctx context.Context, recData *pb.Data) (*pb.Ack
 	ack := &pb.Ack{
 		Status:                "ok",
 		OriginalSentTimestamp: recData.SentTimestamp,
-		ReceivedTimestamp:     strconv.Itoa(int(ReceivedTimestamp)),
+		ReceivedTimestamp:     strconv.Itoa(int(recTimestamp)),
 		AckSentTimestamp:      strconv.Itoa(int(time.Now().UnixMilli())),
 	}
 
@@ -118,10 +117,13 @@ func sendDataToStorage(client pb.AirQualityMonitoringClient, d *api.AirQualityDa
 }
 
 // processTicker processes the ticker event
-func ProcessTicker(client pb.AirQualityMonitoringClient, serverName string, metricList *metric.Metric) error {
-
+func ProcessTicker(client *pb.AirQualityMonitoringClient, serverName string, metricList *metric.Metric) error {
+	if *client == nil {
+		log.Printf("Client is not ready yet")
+		return nil
+	}
 	go func(m *metric.Metric) {
-		pong, err := client.CheckConnection(context.Background(), &pb.Data{
+		pong, err := (*client).CheckConnection(context.Background(), &pb.Data{
 			Payload:       "ping",
 			SentTimestamp: fmt.Sprintf("%d", int(time.Now().UnixMilli())),
 		})

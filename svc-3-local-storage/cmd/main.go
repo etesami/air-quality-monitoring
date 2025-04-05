@@ -84,8 +84,6 @@ func main() {
 	metricList := &metric.Metric{
 		RttTimes:        make(map[string][]float64),
 		ProcessingTimes: make(map[string][]float64),
-		FailureCount:    make(map[string]int),
-		SuccessCount:    make(map[string]int),
 	}
 
 	db, err := sql.Open("sqlite3", "./data.db")
@@ -113,6 +111,13 @@ func main() {
 		}
 	}()
 
+	// First call to processTicker
+	ctx := context.Background()
+	if err := internal.ProcessTicker(ctx, &clientProcessor, db, "processor", metricList); err != nil {
+		log.Printf("Error during processing: %v", err)
+	}
+	ctx = context.WithValue(ctx, "lastCallTime", time.Now())
+
 	// Frequently send new data to the processor service
 	updateFrequencyStr := os.Getenv("SVC_LO_STRG_UPDATE_FREQUENCY")
 	updateFrequency, err := strconv.Atoi(updateFrequencyStr)
@@ -120,17 +125,16 @@ func main() {
 		log.Fatalf("Error parsing update frequency: %v", err)
 	}
 	ticker := time.NewTicker(time.Duration(updateFrequency) * time.Minute)
-	ctx := context.Background()
 	defer ticker.Stop()
 
-	go func() {
+	go func(m *metric.Metric, c *pb.AirQualityMonitoringClient) {
 		for range ticker.C {
-			if err := internal.ProcessTicker(ctx, clientProcessor, db, "processor", metricList); err != nil {
+			if err := internal.ProcessTicker(ctx, c, db, "processor", m); err != nil {
 				log.Printf("Error during processing: %v", err)
 			}
 			ctx = context.WithValue(ctx, "lastCallTime", time.Now())
 		}
-	}()
+	}(metricList, &clientProcessor)
 
 	metricAddr := os.Getenv("SVC_LO_STRG_METRIC_ADDR")
 	metricPort := os.Getenv("SVC_LO_STRG_METRIC_PORT")

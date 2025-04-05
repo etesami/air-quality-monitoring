@@ -22,6 +22,7 @@ func createTables(db *sql.DB) error {
 	// Create your tables here
 	queries := []string{`
 		CREATE TABLE IF NOT EXISTS air_quality (
+				hash TEXT PRIMARY KEY UNIQUE,
 				aqi INTEGER,
 				timestamp DATETIME,
 				dewPoint INTEGER,
@@ -35,7 +36,7 @@ func createTables(db *sql.DB) error {
 				FOREIGN KEY (city_id) REFERENCES city(idx)
 		);`,
 		`CREATE TABLE IF NOT EXISTS city (
-				idx INTEGER PRIMARY KEY,
+				idx INTEGER PRIMARY KEY UNIQUE,
 				cityName TEXT,
 				lat REAL,
 				lng REAL
@@ -78,8 +79,6 @@ func main() {
 	metricList := &metric.Metric{
 		RttTimes:        make(map[string][]float64),
 		ProcessingTimes: make(map[string][]float64),
-		FailureCount:    make(map[string]int),
-		SuccessCount:    make(map[string]int),
 	}
 
 	db, err := sql.Open("sqlite3", "./data.db")

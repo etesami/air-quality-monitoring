@@ -102,12 +102,12 @@ func (s Server) SendDataToServer(ctx context.Context, recData *pb.Data) (*pb.Ack
 }
 
 func insertToDb(db *sql.DB, data []dpapi.EnhancedDataResponse) error {
-	tx, err := db.Begin()
-	if err != nil {
-		return err
-	}
-
+	count := 0
 	for _, record := range data {
+		tx, err := db.Begin()
+		if err != nil {
+			return err
+		}
 
 		_, err = tx.Exec("INSERT INTO city (idx, cityName, lat, lng) VALUES ($1, $2, $3, $4)",
 			record.City.Idx,
@@ -115,8 +115,24 @@ func insertToDb(db *sql.DB, data []dpapi.EnhancedDataResponse) error {
 			record.City.Lat,
 			record.City.Lng,
 		)
+		if err != nil && err.Error() != "UNIQUE constraint failed: city.idx" {
+			log.Printf("Error inserting city: %v\n", err)
+			tx.Rollback()
+			continue
+		}
 
-		_, err = tx.Exec("INSERT INTO air_quality (aqi, timestamp, dewPoint, humidity, pressure, temperature, windSpeed, windGust, pm25, city_id) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)",
+		hash, err := generateHash(map[string]any{
+			"city_id":   record.City.Idx,
+			"timestamp": record.AirQualityData.Timestamp,
+		})
+		if err != nil {
+			fmt.Printf("Error generating hash: %v\n", err)
+			tx.Rollback()
+			continue
+		}
+
+		_, err = tx.Exec("INSERT INTO air_quality (hash, aqi, timestamp, dewPoint, humidity, pressure, temperature, windSpeed, windGust, pm25, city_id) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)",
+			hash,
 			record.AirQualityData.Aqi,
 			record.AirQualityData.Timestamp,
 			record.AirQualityData.DewPoint,
@@ -128,21 +144,28 @@ func insertToDb(db *sql.DB, data []dpapi.EnhancedDataResponse) error {
 			record.AirQualityData.PM25,
 			record.City.Idx,
 		)
+		if err != nil {
+			if err.Error() != "UNIQUE constraint failed: air_quality.hash" {
+				log.Printf("Error inserting air quality data: %v\n", err)
+			}
+			tx.Rollback()
+			continue
+		}
 
 		if record.Alert != nil {
 
 			log.Printf("Alert: %v\n", record.Alert)
 			hash, err := generateHash(*record.Alert)
 			if err != nil {
-				fmt.Printf("Error generating hash: %v\n", err)
 				tx.Rollback()
+				continue
 			}
 			effective, err1 := time.Parse(time.RFC3339, record.Alert.AlertEffective)
 			expires, err2 := time.Parse(time.RFC3339, record.Alert.AlertExpires)
 			if err1 != nil || err2 != nil {
-				log.Printf("Error parsing timestamp: %v", fmt.Errorf("%v, %v", err1, err2))
+				fmt.Printf("error parsing timestamp: %v", fmt.Errorf("%v, %v", err1, err2))
 				tx.Rollback()
-				return fmt.Errorf("%v, %v", err1, err2)
+				continue
 			}
 
 			_, err = tx.Exec("INSERT INTO alert (hash, alertDesc, alertEffective, alertExpires, alertStatus, alertCertainty, alertUrgency, alertSeverity, alertHeadline, alertDescription, alertEvent, city_id) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)",
@@ -159,19 +182,25 @@ func insertToDb(db *sql.DB, data []dpapi.EnhancedDataResponse) error {
 				record.Alert.AlertEvent,
 				record.City.Idx,
 			)
+			if err != nil && err.Error() != "UNIQUE constraint failed: alert.hash" {
+				log.Printf("Error inserting alert data: %v\n", err)
+				tx.Rollback()
+				continue
+			}
 		}
 
-		if err != nil {
-			tx.Rollback()
+		if err := tx.Commit(); err != nil {
+			log.Printf("Error committing transaction: %v\n", err)
 			return err
 		}
+		count++
 	}
 
-	log.Printf("Inserted [%d] items into the database.", len(data))
-	return tx.Commit()
+	log.Printf("Inserted [%d]/[%d] items into the database.", count, len(data))
+	return nil
 }
 
-func generateHash(data dpapi.Alert) (string, error) {
+func generateHash(data any) (string, error) {
 	byteAltert, err := json.Marshal(data)
 	if err != nil {
 		log.Printf("Error marshalling JSON: %v", err)
