@@ -36,8 +36,8 @@ func main() {
 		Token: token,
 	}
 
-	svcAddress := os.Getenv("SVC_TA_INGESTION_ADDR")
-	svcPort := os.Getenv("SVC_TA_INGESTION_PORT")
+	svcAddress := os.Getenv("SVC_INGESTION_ADDR")
+	svcPort := os.Getenv("SVC_INGESTION_PORT")
 	svc := &api.Service{
 		Address: svcAddress,
 		Port:    svcPort,
@@ -70,7 +70,7 @@ func main() {
 		log.Printf("Error during processing: %v", err)
 	}
 
-	updateFrequencyStr := os.Getenv("SVC_LO_COLC_UPDATE_FREQUENCY")
+	updateFrequencyStr := os.Getenv("UPDATE_FREQUENCY")
 	updateFrequency, err := strconv.Atoi(updateFrequencyStr)
 	if err != nil {
 		log.Fatalf("Error parsing update frequency: %v", err)
@@ -86,8 +86,8 @@ func main() {
 		}
 	}(&client, metricList)
 
-	metricAddr := os.Getenv("SVC_LO_COLC_METRIC_ADDR")
-	metricPort := os.Getenv("SVC_LO_COLC_METRIC_PORT")
+	metricAddr := os.Getenv("METRIC_ADDR")
+	metricPort := os.Getenv("METRIC_PORT")
 	http.HandleFunc("/metrics", metricList.IndexHandler())
 	http.HandleFunc("/metrics/rtt", metricList.RttHandler())
 	http.HandleFunc("/metrics/processing", metricList.ProcessingTimeHandler())

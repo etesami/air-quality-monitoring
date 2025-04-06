@@ -69,8 +69,8 @@ func createTables(db *sql.DB) error {
 
 func main() {
 
-	svcAddress := os.Getenv("SVC_LO_AGGR_STRG_ADDR")
-	svcPort := os.Getenv("SVC_LO_AGGR_STRG_PORT")
+	svcAddress := os.Getenv("SVC_AGGR_STRG_ADDR")
+	svcPort := os.Getenv("SVC_AGGR_STRG_PORT")
 	thisSvc := &api.Service{
 		Address: svcAddress,
 		Port:    svcPort,
@@ -106,8 +106,8 @@ func main() {
 		}
 	}()
 
-	metricAddr := os.Getenv("SVC_LO_AG_STRG_METRIC_ADDR")
-	metricPort := os.Getenv("SVC_LO_AG_STRG_METRIC_PORT")
+	metricAddr := os.Getenv("METRIC_ADDR")
+	metricPort := os.Getenv("METRIC_PORT")
 	log.Printf("Starting metric server on :%s\n", metricPort)
 	http.HandleFunc("/metrics", metricList.IndexHandler())
 	http.HandleFunc("/metrics/rtt", metricList.RttHandler())

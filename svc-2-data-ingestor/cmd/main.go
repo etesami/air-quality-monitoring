@@ -20,8 +20,8 @@ import (
 
 func main() {
 	// Target service initialization
-	svcTargetAddress := os.Getenv("SVC_TA_LO_STRG_ADDR")
-	svcTargetPort := os.Getenv("SVC_TA_LO_STRG_PORT")
+	svcTargetAddress := os.Getenv("SVC_STRG_ADDR")
+	svcTargetPort := os.Getenv("SVC_STRG_PORT")
 	targetSvc := &api.Service{
 		Address: svcTargetAddress,
 		Port:    svcTargetPort,
@@ -57,8 +57,8 @@ func main() {
 	}
 
 	// Local service initialization
-	svcAddress := os.Getenv("SVC_LO_INGST_ADDR")
-	svcPort := os.Getenv("SVC_LO_INGST_PORT")
+	svcAddress := os.Getenv("SVC_INGST_ADDR")
+	svcPort := os.Getenv("SVC_INGST_PORT")
 	localSvc := &api.Service{
 		Address: svcAddress,
 		Port:    svcPort,
@@ -89,7 +89,7 @@ func main() {
 	}
 
 	// Set up a ticker to periodically call the gRPC server to measure the RTT
-	updateFrequencyStr := os.Getenv("SVC_LO_INGST_UPDATE_FREQUENCY")
+	updateFrequencyStr := os.Getenv("UPDATE_FREQUENCY")
 	updateFrequency, err := strconv.Atoi(updateFrequencyStr)
 	if err != nil {
 		log.Fatalf("Error parsing update frequency: %v", err)
@@ -105,8 +105,8 @@ func main() {
 		}
 	}(metricList, &clientStrg)
 
-	metricAddr := os.Getenv("SVC_LO_INGST_METRIC_ADDR")
-	metricPort := os.Getenv("SVC_LO_INGST_METRIC_PORT")
+	metricAddr := os.Getenv("METRIC_ADDR")
+	metricPort := os.Getenv("METRIC_PORT")
 	http.HandleFunc("/metrics", metricList.IndexHandler())
 	http.HandleFunc("/metrics/rtt", metricList.RttHandler())
 	http.HandleFunc("/metrics/processing", metricList.ProcessingTimeHandler())

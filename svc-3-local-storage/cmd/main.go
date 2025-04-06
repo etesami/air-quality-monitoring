@@ -43,8 +43,8 @@ func createTables(db *sql.DB) error {
 func main() {
 
 	// Target service initialization
-	svcTargetAddress := os.Getenv("SVC_TA_PROCESSOR_ADDR")
-	svcTargetPort := os.Getenv("SVC_TA_PROCESSOR_PORT")
+	svcTargetAddress := os.Getenv("SVC_PROCESSOR_ADDR")
+	svcTargetPort := os.Getenv("SVC_PROCESSOR_PORT")
 	targetSvc := &api.Service{
 		Address: svcTargetAddress,
 		Port:    svcTargetPort,
@@ -74,8 +74,8 @@ func main() {
 	}()
 	defer conn.Close()
 
-	svcAddress := os.Getenv("SVC_LO_STRG_ADDR")
-	svcPort := os.Getenv("SVC_LO_STRG_PORT")
+	svcAddress := os.Getenv("SVC_STRG_ADDR")
+	svcPort := os.Getenv("SVC_STRG_PORT")
 	thisSvc := &api.Service{
 		Address: svcAddress,
 		Port:    svcPort,
@@ -119,7 +119,7 @@ func main() {
 	ctx = context.WithValue(ctx, "lastCallTime", time.Now())
 
 	// Frequently send new data to the processor service
-	updateFrequencyStr := os.Getenv("SVC_LO_STRG_UPDATE_FREQUENCY")
+	updateFrequencyStr := os.Getenv("UPDATE_FREQUENCY")
 	updateFrequency, err := strconv.Atoi(updateFrequencyStr)
 	if err != nil {
 		log.Fatalf("Error parsing update frequency: %v", err)
@@ -136,8 +136,8 @@ func main() {
 		}
 	}(metricList, &clientProcessor)
 
-	metricAddr := os.Getenv("SVC_LO_STRG_METRIC_ADDR")
-	metricPort := os.Getenv("SVC_LO_STRG_METRIC_PORT")
+	metricAddr := os.Getenv("METRIC_ADDR")
+	metricPort := os.Getenv("METRIC_PORT")
 	log.Printf("Starting metric server on :%s\n", metricPort)
 	http.HandleFunc("/metrics", metricList.IndexHandler())
 	http.HandleFunc("/metrics/rtt", metricList.RttHandler())

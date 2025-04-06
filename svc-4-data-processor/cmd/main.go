@@ -26,8 +26,8 @@ func main() {
 	}
 
 	// Aggregated storage service initialization
-	svcTargetAggrAddress := os.Getenv("SVC_TA_AGGR_STRG_ADDR")
-	svcTargetAggrPort := os.Getenv("SVC_TA_AGGR_STRG_PORT")
+	svcTargetAggrAddress := os.Getenv("SVC_AGGR_STRG_ADDR")
+	svcTargetAggrPort := os.Getenv("SVC_AGGR_STRG_PORT")
 	targetSvc := &api.Service{
 		Address: svcTargetAggrAddress,
 		Port:    svcTargetAggrPort,
@@ -56,8 +56,8 @@ func main() {
 	}()
 	defer conn.Close()
 
-	svcAddress := os.Getenv("SVC_LO_PROCESSOR_ADDR")
-	svcPort := os.Getenv("SVC_LO_PROCESSOR_PORT")
+	svcAddress := os.Getenv("SVC_PROCESSOR_ADDR")
+	svcPort := os.Getenv("SVC_PROCESSOR_PORT")
 	thisSvc := &api.Service{
 		Address: svcAddress,
 		Port:    svcPort,
@@ -82,7 +82,7 @@ func main() {
 		log.Printf("Error during processing: %v", err)
 	}
 
-	updateFrequencyStr := os.Getenv("SVC_LO_DP_UPDATE_FREQUENCY")
+	updateFrequencyStr := os.Getenv("UPDATE_FREQUENCY")
 	updateFrequency, err := strconv.Atoi(updateFrequencyStr)
 	if err != nil {
 		log.Fatalf("Error parsing update frequency: %v", err)
@@ -99,8 +99,8 @@ func main() {
 		}
 	}(m, &clientAggr)
 
-	metricAddr := os.Getenv("SVC_LO_DP_METRIC_ADDR")
-	metricPort := os.Getenv("SVC_LO_DP_METRIC_PORT")
+	metricAddr := os.Getenv("METRIC_ADDR")
+	metricPort := os.Getenv("METRIC_PORT")
 	log.Printf("Starting metric server on :%s\n", metricPort)
 	http.HandleFunc("/metrics", m.IndexHandler())
 	http.HandleFunc("/metrics/rtt", m.RttHandler())
