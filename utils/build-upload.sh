@@ -35,6 +35,7 @@ build_service() {
   PARENT_DIR=$(dirname "$(realpath "$0")")
 
   cd $PARENT_DIR/../$sPath
+  go mod tidy
   docker build -t $sName:$v .
 }
 
@@ -44,21 +45,27 @@ build_all() {
   PARENT_DIR=$(dirname "$(realpath "$0")")
 
   cd $PARENT_DIR/../svc-1-data-collector
+  go mod tidy
   docker build -t svc-collector:$v .
 
   cd $PARENT_DIR/../svc-2-data-ingestor
+  go mod tidy
   docker build -t svc-ingestor:$v .
 
   cd $PARENT_DIR/../svc-3-local-storage
+  go mod tidy
   docker build -t svc-local-storage:$v .
 
   cd $PARENT_DIR/../svc-4-data-processor
+  go mod tidy
   docker build -t svc-processor:$v .
 
   cd $PARENT_DIR/../svc-5-central-storage
+  go mod tidy
   docker build -t svc-central-storage:$v .
 
   cd $PARENT_DIR/../svc-6-dashboard
+  go mod tidy
   docker build -t svc-dashboard:$v .
 }
 

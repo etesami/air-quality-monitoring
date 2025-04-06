@@ -234,21 +234,22 @@ func ProcessTicker(ctx context.Context, client *pb.AirQualityMonitoringClient, d
 		return nil
 	}
 	go func(m *metric.Metric) {
-		pong, err := (*client).CheckConnection(context.Background(), &pb.Data{
+		ping := &pb.Data{
 			Payload:       "ping",
 			SentTimestamp: fmt.Sprintf("%d", int(time.Now().UnixMilli())),
-		})
+		}
+		pong, err := (*client).CheckConnection(context.Background(), ping)
 		if err != nil {
 			log.Printf("Error checking connection: %v", err)
 			return
 		}
-		rtt, err := utils.CalculateRtt(time.Now(), pong.ReceivedTimestamp, time.Now(), pong.AckSentTimestamp)
+		rtt, err := utils.CalculateRtt(ping.SentTimestamp, pong.ReceivedTimestamp, pong.AckSentTimestamp, time.Now())
 		if err != nil {
 			log.Printf("Error calculating RTT: %v", err)
 			return
 		}
 		m.AddRttTime(serverName, float64(rtt)/1000.0)
-		log.Printf("RTT to ingestion service: [%.2f] ms\n", float64(rtt)/1000.0)
+		log.Printf("RTT to [%s] service: [%.2f] ms\n", serverName, float64(rtt)/1000.0)
 	}(metricList)
 
 	// Check if there is any data to be sent

@@ -14,16 +14,15 @@ import (
 	pb "github.com/etesami/air-quality-monitoring/pkg/protoc"
 	internal "github.com/etesami/air-quality-monitoring/svc-data-processing/internal"
 
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 )
 
 func main() {
 
-	m := &metric.Metric{
-		RttTimes:        make(map[string][]float64),
-		ProcessingTimes: make(map[string][]float64),
-	}
+	m := &metric.Metric{}
+	m.RegisterMetrics()
 
 	// Aggregated storage service initialization
 	svcTargetAggrAddress := os.Getenv("SVC_AGGR_STRG_ADDR")
@@ -101,10 +100,7 @@ func main() {
 
 	metricAddr := os.Getenv("METRIC_ADDR")
 	metricPort := os.Getenv("METRIC_PORT")
-	log.Printf("Starting metric server on :%s\n", metricPort)
-	http.HandleFunc("/metrics", m.IndexHandler())
-	http.HandleFunc("/metrics/rtt", m.RttHandler())
-	http.HandleFunc("/metrics/processing", m.ProcessingTimeHandler())
-	log.Fatal(http.ListenAndServe(fmt.Sprintf("%s:%s", metricAddr, metricPort), nil))
-
+	http.Handle("/metrics", promhttp.Handler())
+	log.Printf("Starting server on :%s\n", metricPort)
+	http.ListenAndServe(fmt.Sprintf("%s:%s", metricAddr, metricPort), nil)
 }

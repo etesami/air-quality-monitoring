@@ -14,6 +14,7 @@ import (
 	pb "github.com/etesami/air-quality-monitoring/pkg/protoc"
 	internal "github.com/etesami/air-quality-monitoring/svc-data-ingestion/internal"
 
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 )
@@ -51,10 +52,8 @@ func main() {
 	}()
 	defer conn.Close()
 
-	metricList := &metric.Metric{
-		RttTimes:        make(map[string][]float64),
-		ProcessingTimes: make(map[string][]float64),
-	}
+	m := &metric.Metric{}
+	m.RegisterMetrics()
 
 	// Local service initialization
 	svcAddress := os.Getenv("SVC_INGST_ADDR")
@@ -73,7 +72,7 @@ func main() {
 	grpcServer := grpc.NewServer()
 	pb.RegisterAirQualityMonitoringServer(grpcServer, &internal.Server{
 		Client: &clientStrg,
-		Metric: metricList,
+		Metric: m,
 	})
 
 	go func() {
@@ -84,7 +83,7 @@ func main() {
 	}()
 
 	// First call to processTicker
-	if err := internal.ProcessTicker(&clientStrg, "local-storage", metricList); err != nil {
+	if err := internal.ProcessTicker(&clientStrg, "local-storage", m); err != nil {
 		log.Printf("Error during processing: %v", err)
 	}
 
@@ -103,13 +102,11 @@ func main() {
 				log.Printf("Error during processing: %v", err)
 			}
 		}
-	}(metricList, &clientStrg)
+	}(m, &clientStrg)
 
 	metricAddr := os.Getenv("METRIC_ADDR")
 	metricPort := os.Getenv("METRIC_PORT")
-	http.HandleFunc("/metrics", metricList.IndexHandler())
-	http.HandleFunc("/metrics/rtt", metricList.RttHandler())
-	http.HandleFunc("/metrics/processing", metricList.ProcessingTimeHandler())
+	http.Handle("/metrics", promhttp.Handler())
 	log.Printf("Starting server on :%s\n", metricPort)
-	log.Fatal(http.ListenAndServe(fmt.Sprintf("%s:%s", metricAddr, metricPort), nil))
+	http.ListenAndServe(fmt.Sprintf("%s:%s", metricAddr, metricPort), nil)
 }
