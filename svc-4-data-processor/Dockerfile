@@ -7,13 +7,13 @@ RUN go mod download
 
 COPY . .
 
-RUN go build -o collector cmd/main.go
+RUN go build -o processor cmd/main.go
 
-FROM alpine:latest
+FROM alpine:3.21.3
 RUN apk add --no-cache libc6-compat
 
 WORKDIR /root/
-COPY --from=build /app/collector .
+COPY --from=build /app/processor .
 
 EXPOSE 50052 8001
-CMD ["/root/collector"]
+CMD ["/root/processor"]

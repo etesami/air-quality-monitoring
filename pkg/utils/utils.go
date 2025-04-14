@@ -7,13 +7,14 @@ import (
 )
 
 // calculateRtt calculates the round-trip time (RTT) based on the current time and the ack time
-func CalculateRtt(msgSentTime time.Time, msgRecTime string, ackRecTime time.Time, ackSentTime string) (float64, error) {
-	msgRecTime1, err1 := StrUnixToTime(msgRecTime)
-	ackSentTime1, err2 := StrUnixToTime(ackSentTime)
-	if err1 != nil || err2 != nil {
-		return -1, fmt.Errorf("error parsing timestamps: %v, %v", err1, err2)
+func CalculateRtt(msgSentTime string, msgRecTime string, ackSentTime string, ackRecTime time.Time) (float64, error) {
+	msgSentTime1, err1 := StrUnixToTime(msgSentTime)
+	msgRecTime1, err2 := StrUnixToTime(msgRecTime)
+	ackSentTime1, err3 := StrUnixToTime(ackSentTime)
+	if err1 != nil || err2 != nil || err3 != nil {
+		return -1, fmt.Errorf("error parsing timestamps: (%v, %v, %v)", err1, err2, err3)
 	}
-	t1 := msgRecTime1.Sub(msgSentTime)
+	t1 := msgRecTime1.Sub(msgSentTime1)
 	t2 := ackRecTime.Sub(ackSentTime1)
 	rtt := float64(t1+t2) / 1000.0
 	return rtt, nil

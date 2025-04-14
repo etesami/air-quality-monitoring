@@ -17,6 +17,7 @@ import (
 	internal "github.com/etesami/air-quality-monitoring/svc-local-storage/internal"
 
 	_ "github.com/mattn/go-sqlite3"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 )
@@ -43,8 +44,8 @@ func createTables(db *sql.DB) error {
 func main() {
 
 	// Target service initialization
-	svcTargetAddress := os.Getenv("SVC_TA_PROCESSOR_ADDR")
-	svcTargetPort := os.Getenv("SVC_TA_PROCESSOR_PORT")
+	svcTargetAddress := os.Getenv("SVC_PROCESSOR_ADDR")
+	svcTargetPort := os.Getenv("SVC_PROCESSOR_PORT")
 	targetSvc := &api.Service{
 		Address: svcTargetAddress,
 		Port:    svcTargetPort,
@@ -74,17 +75,15 @@ func main() {
 	}()
 	defer conn.Close()
 
-	svcAddress := os.Getenv("SVC_LO_STRG_ADDR")
-	svcPort := os.Getenv("SVC_LO_STRG_PORT")
+	svcAddress := os.Getenv("SVC_STRG_ADDR")
+	svcPort := os.Getenv("SVC_STRG_PORT")
 	thisSvc := &api.Service{
 		Address: svcAddress,
 		Port:    svcPort,
 	}
 
-	metricList := &metric.Metric{
-		RttTimes:        make(map[string][]float64),
-		ProcessingTimes: make(map[string][]float64),
-	}
+	m := &metric.Metric{}
+	m.RegisterMetrics()
 
 	db, err := sql.Open("sqlite3", "./data.db")
 	if err != nil {
@@ -102,7 +101,7 @@ func main() {
 		log.Fatal(err)
 	}
 	grpcServer := grpc.NewServer()
-	pb.RegisterAirQualityMonitoringServer(grpcServer, &internal.Server{Db: db, Metric: metricList})
+	pb.RegisterAirQualityMonitoringServer(grpcServer, &internal.Server{Db: db, Metric: m})
 
 	go func() {
 		log.Printf("gRPC server is running on port :%s\n", thisSvc.Port)
@@ -113,13 +112,13 @@ func main() {
 
 	// First call to processTicker
 	ctx := context.Background()
-	if err := internal.ProcessTicker(ctx, &clientProcessor, db, "processor", metricList); err != nil {
+	if err := internal.ProcessTicker(ctx, &clientProcessor, db, "processor", m); err != nil {
 		log.Printf("Error during processing: %v", err)
 	}
 	ctx = context.WithValue(ctx, "lastCallTime", time.Now())
 
 	// Frequently send new data to the processor service
-	updateFrequencyStr := os.Getenv("SVC_LO_STRG_UPDATE_FREQUENCY")
+	updateFrequencyStr := os.Getenv("UPDATE_FREQUENCY")
 	updateFrequency, err := strconv.Atoi(updateFrequencyStr)
 	if err != nil {
 		log.Fatalf("Error parsing update frequency: %v", err)
@@ -134,13 +133,11 @@ func main() {
 			}
 			ctx = context.WithValue(ctx, "lastCallTime", time.Now())
 		}
-	}(metricList, &clientProcessor)
+	}(m, &clientProcessor)
 
-	metricAddr := os.Getenv("SVC_LO_STRG_METRIC_ADDR")
-	metricPort := os.Getenv("SVC_LO_STRG_METRIC_PORT")
-	log.Printf("Starting metric server on :%s\n", metricPort)
-	http.HandleFunc("/metrics", metricList.IndexHandler())
-	http.HandleFunc("/metrics/rtt", metricList.RttHandler())
-	http.HandleFunc("/metrics/processing", metricList.ProcessingTimeHandler())
-	log.Fatal(http.ListenAndServe(fmt.Sprintf("%s:%s", metricAddr, metricPort), nil))
+	metricAddr := os.Getenv("METRIC_ADDR")
+	metricPort := os.Getenv("METRIC_PORT")
+	http.Handle("/metrics", promhttp.Handler())
+	log.Printf("Starting server on :%s\n", metricPort)
+	http.ListenAndServe(fmt.Sprintf("%s:%s", metricAddr, metricPort), nil)
 }
