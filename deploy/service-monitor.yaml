@@ -1,0 +1,25 @@
+# Air Quality App exposes Prometheus metrics on port 9100
+# To scrape these metrics, we need to create a ServiceMonitor.
+
+# Prerequisites:
+# - Prometheus Operator is installed in the cluster
+# - The ServiceMonitor CRD is available
+
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: air-quality
+  namespace: prometheus
+spec:
+  endpoints:
+  - path: /metrics
+    port: metrics
+    scheme: http
+    scrapeTimeout: 30s
+  namespaceSelector:
+    matchNames:
+    - default
+  selector:
+    matchLabels:
+      skycluster.io/app-name: air-quality
+      skycluster.io/managed-by: skycluster

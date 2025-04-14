@@ -75,7 +75,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("Error parsing update frequency: %v", err)
 	}
-	ticker := time.NewTicker(time.Duration(updateFrequency) * time.Minute)
+	ticker := time.NewTicker(time.Duration(updateFrequency) * time.Second)
 	defer ticker.Stop()
 
 	go func(c *pb.AirQualityMonitoringClient, metricList *metric.Metric) {
