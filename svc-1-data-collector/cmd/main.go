@@ -24,8 +24,24 @@ func main() {
 	Lng1, err2 := strconv.ParseFloat(os.Getenv("LNG1"), 64)
 	Lat2, err3 := strconv.ParseFloat(os.Getenv("LAT2"), 64)
 	Lng2, err4 := strconv.ParseFloat(os.Getenv("LNG2"), 64)
+	locationIdentifier := ""
+
 	if err1 != nil || err2 != nil || err3 != nil || err4 != nil {
-		log.Fatalf("Error parsing environment variables: %v, %v, %v, %v", err1, err2, err3, err4)
+		log.Printf("Error parsing coordinates. Using a random city location coordinate.")
+
+		hostname, err := os.Hostname()
+		if err != nil {
+			fmt.Printf("Error getting hostname: %v\n", err)
+			return
+		}
+		locationIdentifier = hostname
+
+		coordinates := internal.GetRandomBoxCoordination(locationIdentifier)
+		Lat1 = coordinates[0]
+		Lng1 = coordinates[1]
+		Lat2 = coordinates[2]
+		Lng2 = coordinates[3]
+		log.Printf("Using random box coordinates: %f, %f, %f, %f\n", Lat1, Lng1, Lat2, Lng2)
 	}
 
 	token := os.Getenv("TOKEN")

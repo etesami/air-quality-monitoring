@@ -21,6 +21,8 @@ spec:
         image: registry.skycluster.io/svc-collector:0.1.0
         imagePullPolicy: Always
         env:
+          # If the LNG and LAT are not set, the collector will select 
+          # a random city to collect data from.
           - name: LNG1
             value: "-122.500722"
           - name: LAT1
