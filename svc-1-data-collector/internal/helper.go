@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"math/rand"
 	"net/http"
 	"sync"
 	"time"
@@ -182,8 +183,23 @@ func ProcessTicker(client *pb.AirQualityMonitoringClient, serverName string, loc
 	if err != nil {
 		return fmt.Errorf("getting location IDs: %w", err)
 	}
+	// panic if no locations found
+	if len(locationIds) == 0 {
+		panic(fmt.Errorf("no location IDs found: [%v]", data))
+	}
 	log.Printf("Received [%d] location IDs: [%v] \n", len(locationIds), locationIds)
+
 	pTime = time.Since(st).Milliseconds()
+
+	// if there are more than 5 locations, we only process the 5 location selected randomly
+	if len(locationIds) > 5 {
+		// randomly select 5 locations
+		rand.Shuffle(len(locationIds), func(i, j int) {
+			locationIds[i], locationIds[j] = locationIds[j], locationIds[i]
+		})
+		locationIds = locationIds[:5]
+		log.Printf("Processing only the first 5 location IDs: [%v] \n", locationIds)
+	}
 
 	var wg sync.WaitGroup
 	for _, locationId := range locationIds {
