@@ -67,11 +67,11 @@ func validateDataLocDetails(data map[string]any) error {
 		return fmt.Errorf("data is nil")
 	}
 
-	v, ok := data["rxs"]
+	_, ok := data["data"]
 	if !ok {
-		return fmt.Errorf("key 'rxs' not found in data")
+		return fmt.Errorf("key 'data' not found in data")
 	}
-	if vv, ok := v.(map[string]any)["status"]; !ok || vv.(string) != "ok" {
+	if vv, ok := data["status"]; !ok || vv.(string) != "ok" {
 		return fmt.Errorf("invalid status: %v", vv)
 	}
 	return nil
@@ -95,7 +95,7 @@ func getLocationIds(data map[string]any) ([]string, error) {
 // getLocationData fetches data for a specific location ID
 func getLocationData(locationId, token string) (map[string]any, error) {
 	url := fmt.Sprintf(
-		"https://api.waqi.info/v2/feed/@%s/?token=%s",
+		"https://api.waqi.info/feed/@%s/?token=%s",
 		locationId, token)
 
 	resp, err := http.Get(url)
@@ -182,7 +182,7 @@ func ProcessTicker(client *pb.AirQualityMonitoringClient, serverName string, loc
 	if err != nil {
 		return fmt.Errorf("getting location IDs: %w", err)
 	}
-	log.Printf("Received [%d] location IDs. \n", len(locationIds))
+	log.Printf("Received [%d] location IDs: [%v] \n", len(locationIds), locationIds)
 	pTime = time.Since(st).Milliseconds()
 
 	var wg sync.WaitGroup
@@ -206,7 +206,7 @@ func ProcessTicker(client *pb.AirQualityMonitoringClient, serverName string, loc
 			pt += time.Since(st).Milliseconds()
 			m.AddProcessingTime("processing", float64(pt)/1000.0)
 
-			if err := sendToDataIngestionService(*client, locationData["rxs"]); err != nil {
+			if err := sendToDataIngestionService(*client, locationData["data"]); err != nil {
 				log.Printf("Error sending data to ingestion service: %v", err)
 			}
 
