@@ -3,6 +3,12 @@
 # We want to use some private functinos defined here
 source /home/ubuntu/.functions.sh
 
+HELP="
+Usage: build-upload.sh [OPTIONS]
+  ./build-upload.sh -b -v 0.0.8 -d svc-1-data-collector -s svc-collector
+  ./build-upload.sh -u -v 0.0.8 -s svc-collector -d svc-1-data-collector
+"
+
 while [[ "$#" -gt 0 ]]; do
   case $1 in
     -v|--version) version="$2"; shift ;;
@@ -10,7 +16,7 @@ while [[ "$#" -gt 0 ]]; do
     -d|--svc-dir) svc_dir="$2"; shift ;;
     -b|--build) build=1 ;;
     -u|--upload) upload=1 ;;
-    *) echo "Unknown parameter passed: $1"; exit 1 ;;
+    *) echo $HELP; exit 1 ;;
   esac
   shift
 done
