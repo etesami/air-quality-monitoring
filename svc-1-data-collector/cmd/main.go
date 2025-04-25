@@ -96,7 +96,7 @@ func main() {
 	defer conn.Close()
 	log.Printf("Connected to target service: [%s:%s]\n", svc.Address, svc.Port)
 
-	sentDataBuckets := utils.ParseBuckets(os.Getenv("SENT_DATA_BUCEKTS"))
+	sentDataBuckets := utils.ParseBuckets(os.Getenv("SENT_DATA_BUCKETS"))
 	procTimeBuckets := utils.ParseBuckets(os.Getenv("PROC_TIME_BUCKETS"))
 	rttTimeBuckets := utils.ParseBuckets(os.Getenv("RTT_TIME_BUCKETS"))
 
