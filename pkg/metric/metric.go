@@ -7,23 +7,12 @@ import (
 )
 
 var (
-	// Buckets for processing histogram in milliseconds
-	// customBuckets = []float64{0.01, 0.1, 0.5, 1, 2, 5, 10, 20, 50, 100}
-	procTimeHistogram = prometheus.NewHistogram(
-		prometheus.HistogramOpts{
-			Name:    "processing_time_ms_histogram",
-			Help:    "Histogram of processing times.",
-			Buckets: prometheus.DefBuckets,
-		},
-	)
-	rttTimeHistogram = prometheus.NewHistogramVec(
-		prometheus.HistogramOpts{
-			Name:    "rtt_times_ms_histogram",
-			Help:    "Histogram of round-trip times for different services.",
-			Buckets: prometheus.DefBuckets,
-		},
-		[]string{"service"},
-	)
+
+	// should be initialized in main
+	sentDataBytesHistogram *prometheus.HistogramVec
+	procTimeHistogram      prometheus.Histogram
+	rttTimeHistogram       *prometheus.HistogramVec
+
 	procTime = prometheus.NewGauge(
 		prometheus.GaugeOpts{
 			Name: "processing_time_ms",
@@ -47,6 +36,48 @@ func (m *Metric) RegisterMetrics() {
 
 type Metric struct {
 	mu sync.Mutex
+}
+
+func (m *Metric) InitMetrics(sentDataBuckets, procTimeBuckets, rttTimeBuckets []float64) {
+	if sentDataBuckets == nil {
+		sentDataBuckets = prometheus.DefBuckets
+	}
+	if procTimeBuckets == nil {
+		procTimeBuckets = prometheus.DefBuckets
+	}
+	if rttTimeBuckets == nil {
+		rttTimeBuckets = prometheus.DefBuckets
+	}
+
+	sentDataBytesHistogram = prometheus.NewHistogramVec(
+		prometheus.HistogramOpts{
+			Name:    "sent_data_bytes_histogram",
+			Help:    "Histogram of sent data bytes.",
+			Buckets: sentDataBuckets,
+		},
+		[]string{"service"},
+	)
+	procTimeHistogram = prometheus.NewHistogram(
+		prometheus.HistogramOpts{
+			Name:    "processing_time_ms_histogram",
+			Help:    "Histogram of processing times.",
+			Buckets: procTimeBuckets,
+		},
+	)
+	rttTimeHistogram = prometheus.NewHistogramVec(
+		prometheus.HistogramOpts{
+			Name:    "rtt_times_ms_histogram",
+			Help:    "Histogram of round-trip times.",
+			Buckets: rttTimeBuckets,
+		},
+		[]string{"service"},
+	)
+}
+
+func (m *Metric) AddSentDataBytes(s string, bytes float64) {
+	m.lock()
+	defer m.unlock()
+	sentDataBytesHistogram.WithLabelValues(s).Observe(bytes)
 }
 
 func (m *Metric) AddProcessingTime(s string, time float64) {
