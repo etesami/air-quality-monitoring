@@ -55,12 +55,20 @@ func main() {
 				Lng2:  Lng2,
 				Token: token,
 			}
-			ids, err := locData.CollectLocationsIds()
+			log.Printf("Using random box coordinates: [%f, %f, %f, %f]\n", Lat1, Lng1, Lat2, Lng2)
+			data, err := locData.CollectLocationsIds()
+			if err != nil {
+				log.Printf("Error getting location IDs: %v", err)
+				time.Sleep(5 * time.Second)
+				continue
+			}
+			ids, err := internal.GetLocationIds(data)
 			// we need at least 5 locations to continue
-			if err == nil && len(ids) >= 5 {
+			if err != nil || len(ids) >= 4 {
 				break
 			}
-			log.Printf("Error getting location IDs or not enough IDs: %v", err)
+			log.Printf("Not enough locations found [%d]/4.", len(ids))
+			locationIdentifier = fmt.Sprintf("%s%d", locationIdentifier, time.Now().UnixNano())
 			time.Sleep(1 * time.Second)
 		}
 		log.Printf("Using random box coordinates: %f, %f, %f, %f\n", Lat1, Lng1, Lat2, Lng2)

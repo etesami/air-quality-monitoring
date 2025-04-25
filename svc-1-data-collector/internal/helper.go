@@ -80,8 +80,8 @@ func validateDataLocDetails(data map[string]any) error {
 	return nil
 }
 
-// getLocationIds extracts the location IDs from the fetched data
-func getLocationIds(data map[string]any) ([]string, error) {
+// GetLocationIds extracts the location IDs from the fetched data
+func GetLocationIds(data map[string]any) ([]string, error) {
 	if data == nil {
 		return nil, fmt.Errorf("data is nil")
 	}
@@ -184,7 +184,7 @@ func ProcessTicker(client *pb.AirQualityMonitoringClient, serverName string, loc
 	if err := validateDataLocIds(data); err != nil {
 		return fmt.Errorf("validating data: %w", err)
 	}
-	locationIds, err := getLocationIds(data)
+	locationIds, err := GetLocationIds(data)
 	if err != nil {
 		return fmt.Errorf("getting location IDs: %w", err)
 	}
