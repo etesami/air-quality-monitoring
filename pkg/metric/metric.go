@@ -27,18 +27,8 @@ var (
 		[]string{"service"})
 )
 
-func (m *Metric) RegisterMetrics() {
-	prometheus.MustRegister(procTimeHistogram)
-	prometheus.MustRegister(rttTimeHistogram)
-	prometheus.MustRegister(procTime)
-	prometheus.MustRegister(rTTTimes)
-}
+func (m *Metric) RegisterMetrics(sentDataBuckets, procTimeBuckets, rttTimeBuckets []float64) {
 
-type Metric struct {
-	mu sync.Mutex
-}
-
-func (m *Metric) InitMetrics(sentDataBuckets, procTimeBuckets, rttTimeBuckets []float64) {
 	if sentDataBuckets == nil {
 		sentDataBuckets = prometheus.DefBuckets
 	}
@@ -72,6 +62,17 @@ func (m *Metric) InitMetrics(sentDataBuckets, procTimeBuckets, rttTimeBuckets []
 		},
 		[]string{"service"},
 	)
+
+	// Register the metrics with Prometheus
+	prometheus.MustRegister(sentDataBytesHistogram)
+	prometheus.MustRegister(procTimeHistogram)
+	prometheus.MustRegister(rttTimeHistogram)
+	prometheus.MustRegister(procTime)
+	prometheus.MustRegister(rTTTimes)
+}
+
+type Metric struct {
+	mu sync.Mutex
 }
 
 func (m *Metric) AddSentDataBytes(s string, bytes float64) {
