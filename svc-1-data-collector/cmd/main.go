@@ -56,7 +56,8 @@ func main() {
 				Token: token,
 			}
 			ids, err := locData.CollectLocationsIds()
-			if err == nil && len(ids) < 5 {
+			// we need at least 5 locations to continue
+			if err == nil && len(ids) >= 5 {
 				break
 			}
 			log.Printf("Error getting location IDs or not enough IDs: %v", err)
