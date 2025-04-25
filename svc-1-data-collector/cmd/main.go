@@ -11,6 +11,7 @@ import (
 	api "github.com/etesami/air-quality-monitoring/api"
 	metric "github.com/etesami/air-quality-monitoring/pkg/metric"
 	pb "github.com/etesami/air-quality-monitoring/pkg/protoc"
+	utils "github.com/etesami/air-quality-monitoring/pkg/utils"
 	internal "github.com/etesami/air-quality-monitoring/svc-data-collector/internal"
 
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -24,8 +25,13 @@ func main() {
 	Lng1, err2 := strconv.ParseFloat(os.Getenv("LNG1"), 64)
 	Lat2, err3 := strconv.ParseFloat(os.Getenv("LAT2"), 64)
 	Lng2, err4 := strconv.ParseFloat(os.Getenv("LNG2"), 64)
+	token := os.Getenv("TOKEN")
 	locationIdentifier := ""
 
+	var locData *internal.LocationData
+
+	// if the coordinates are not set, use a random city location,
+	// we ensure at least 5 locations are returned
 	if err1 != nil || err2 != nil || err3 != nil || err4 != nil {
 		log.Printf("Error parsing coordinates. Using a random city location coordinate.")
 
@@ -36,21 +42,35 @@ func main() {
 		}
 		locationIdentifier = hostname
 
-		coordinates := internal.GetRandomBoxCoordination(locationIdentifier)
-		Lat1 = coordinates[0]
-		Lng1 = coordinates[1]
-		Lat2 = coordinates[2]
-		Lng2 = coordinates[3]
+		for {
+			coordinates := internal.GetRandomBoxCoordination(locationIdentifier)
+			Lat1 = coordinates[0]
+			Lng1 = coordinates[1]
+			Lat2 = coordinates[2]
+			Lng2 = coordinates[3]
+			locData = &internal.LocationData{
+				Lat1:  Lat1,
+				Lng1:  Lng1,
+				Lat2:  Lat2,
+				Lng2:  Lng2,
+				Token: token,
+			}
+			ids, err := locData.CollectLocationsIds()
+			if err == nil && len(ids) < 5 {
+				break
+			}
+			log.Printf("Error getting location IDs or not enough IDs: %v", err)
+			time.Sleep(1 * time.Second)
+		}
 		log.Printf("Using random box coordinates: %f, %f, %f, %f\n", Lat1, Lng1, Lat2, Lng2)
-	}
-
-	token := os.Getenv("TOKEN")
-	locData := &internal.LocationData{
-		Lat1:  Lat1,
-		Lng1:  Lng1,
-		Lat2:  Lat2,
-		Lng2:  Lng2,
-		Token: token,
+	} else {
+		locData = &internal.LocationData{
+			Lat1:  Lat1,
+			Lng1:  Lng1,
+			Lat2:  Lat2,
+			Lng2:  Lng2,
+			Token: token,
+		}
 	}
 
 	svcAddress := os.Getenv("SVC_INGESTION_ADDR")
@@ -76,8 +96,12 @@ func main() {
 	defer conn.Close()
 	log.Printf("Connected to target service: [%s:%s]\n", svc.Address, svc.Port)
 
+	sentDataBuckets := utils.ParseBuckets(os.Getenv("SENT_DATA_BUCEKTS"))
+	procTimeBuckets := utils.ParseBuckets(os.Getenv("PROC_TIME_BUCKETS"))
+	rttTimeBuckets := utils.ParseBuckets(os.Getenv("RTT_TIME_BUCKETS"))
+
 	m := &metric.Metric{}
-	m.RegisterMetrics()
+	m.RegisterMetrics(sentDataBuckets, procTimeBuckets, rttTimeBuckets)
 
 	client := pb.NewAirQualityMonitoringClient(conn)
 

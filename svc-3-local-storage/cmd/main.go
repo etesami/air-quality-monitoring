@@ -14,6 +14,7 @@ import (
 	api "github.com/etesami/air-quality-monitoring/api"
 	metric "github.com/etesami/air-quality-monitoring/pkg/metric"
 	pb "github.com/etesami/air-quality-monitoring/pkg/protoc"
+	utils "github.com/etesami/air-quality-monitoring/pkg/utils"
 	internal "github.com/etesami/air-quality-monitoring/svc-local-storage/internal"
 
 	_ "github.com/mattn/go-sqlite3"
@@ -82,8 +83,12 @@ func main() {
 		Port:    svcPort,
 	}
 
+	sentDataBuckets := utils.ParseBuckets(os.Getenv("SENT_DATA_BUCEKTS"))
+	procTimeBuckets := utils.ParseBuckets(os.Getenv("PROC_TIME_BUCKETS"))
+	rttTimeBuckets := utils.ParseBuckets(os.Getenv("RTT_TIME_BUCKETS"))
+
 	m := &metric.Metric{}
-	m.RegisterMetrics()
+	m.RegisterMetrics(sentDataBuckets, procTimeBuckets, rttTimeBuckets)
 
 	db, err := sql.Open("sqlite3", "./data.db")
 	if err != nil {

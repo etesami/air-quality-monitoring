@@ -10,6 +10,8 @@ import (
 	"sync"
 	"time"
 
+	"google.golang.org/protobuf/proto"
+
 	metric "github.com/etesami/air-quality-monitoring/pkg/metric"
 	pb "github.com/etesami/air-quality-monitoring/pkg/protoc"
 	utils "github.com/etesami/air-quality-monitoring/pkg/utils"
@@ -23,7 +25,7 @@ type LocationData struct {
 	Token string  `json:"token"`
 }
 
-func (l *LocationData) collectLocationsIds() (map[string]any, error) {
+func (l *LocationData) CollectLocationsIds() (map[string]any, error) {
 	url := fmt.Sprintf(
 		"https://api.waqi.info/v2/map/bounds?latlng=%f,%f,%f,%f&token=%s",
 		l.Lat1, l.Lng1, l.Lat2, l.Lng2, l.Token)
@@ -118,27 +120,30 @@ func getLocationData(locationId, token string) (map[string]any, error) {
 
 // sendToDataIngestionService sends the data to the data ingestion service
 // It takes a gRPC client and the data to be sent as parameters
-func sendToDataIngestionService(client pb.AirQualityMonitoringClient, data any) error {
+func sendToDataIngestionService(client pb.AirQualityMonitoringClient, data any) (int, error) {
 
 	byteData, err := json.Marshal(data)
 	if err != nil {
-		return fmt.Errorf("failed to marshal data: %v", err)
+		return 0, fmt.Errorf("failed to marshal data: %v", err)
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
 	sentTimestamp := time.Now()
-	ack, err := client.SendDataToServer(ctx, &pb.Data{
+	res := &pb.Data{
 		Payload:       string(byteData),
 		SentTimestamp: fmt.Sprintf("%d", int(sentTimestamp.UnixMilli())),
-	})
-	if err != nil {
-		return fmt.Errorf("send data not successful: %v", err)
 	}
-	log.Printf("Sent [%d] bytes. Ack recevied, status: [%s]\n", len(byteData), ack.Status)
+	ack, err := client.SendDataToServer(ctx, res)
+	if err != nil {
+		return 0, fmt.Errorf("send data not successful: %v", err)
+	}
 
-	return nil
+	bytesSent := proto.Size(res)
+	log.Printf("Sent [%d] bytes. Ack recevied, status: [%s]\n", bytesSent, ack.Status)
+
+	return bytesSent, nil
 }
 
 // processTicker processes the ticker event
@@ -168,7 +173,7 @@ func ProcessTicker(client *pb.AirQualityMonitoringClient, serverName string, loc
 
 	}(metricList)
 
-	data, err := locData.collectLocationsIds()
+	data, err := locData.CollectLocationsIds()
 	if err != nil {
 		return fmt.Errorf("fetching data: %w", err)
 	}
@@ -222,8 +227,10 @@ func ProcessTicker(client *pb.AirQualityMonitoringClient, serverName string, loc
 			pt += time.Since(st).Milliseconds()
 			m.AddProcessingTime("processing", float64(pt)/1000.0)
 
-			if err := sendToDataIngestionService(*client, locationData["data"]); err != nil {
+			if bytes, err := sendToDataIngestionService(*client, locationData["data"]); err != nil {
 				log.Printf("Error sending data to ingestion service: %v", err)
+			} else {
+				m.AddSentDataBytes("ingestor", float64(bytes))
 			}
 
 		}(locationId, metricList, pTime)

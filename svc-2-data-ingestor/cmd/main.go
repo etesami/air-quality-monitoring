@@ -12,6 +12,7 @@ import (
 	api "github.com/etesami/air-quality-monitoring/api"
 	metric "github.com/etesami/air-quality-monitoring/pkg/metric"
 	pb "github.com/etesami/air-quality-monitoring/pkg/protoc"
+	utils "github.com/etesami/air-quality-monitoring/pkg/utils"
 	internal "github.com/etesami/air-quality-monitoring/svc-data-ingestion/internal"
 
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -52,8 +53,12 @@ func main() {
 	}()
 	defer conn.Close()
 
+	sentDataBuckets := utils.ParseBuckets(os.Getenv("SENT_DATA_BUCEKTS"))
+	procTimeBuckets := utils.ParseBuckets(os.Getenv("PROC_TIME_BUCKETS"))
+	rttTimeBuckets := utils.ParseBuckets(os.Getenv("RTT_TIME_BUCKETS"))
+
 	m := &metric.Metric{}
-	m.RegisterMetrics()
+	m.RegisterMetrics(sentDataBuckets, procTimeBuckets, rttTimeBuckets)
 
 	// Local service initialization
 	svcAddress := os.Getenv("SVC_INGST_ADDR")

@@ -13,6 +13,7 @@ import (
 	"github.com/etesami/air-quality-monitoring/pkg/metric"
 	pb "github.com/etesami/air-quality-monitoring/pkg/protoc"
 	"github.com/etesami/air-quality-monitoring/pkg/utils"
+	"google.golang.org/protobuf/proto"
 
 	dpapi "github.com/etesami/air-quality-monitoring/api/data-processing"
 )
@@ -64,8 +65,10 @@ func (s Server) SendDataToServer(ctx context.Context, recData *pb.Data) (*pb.Ack
 			log.Printf("Client is not ready yet")
 			return
 		}
-		if err := sendDataToStorage(*s.Client, string(procResBytes)); err != nil {
+		if sentBytes, err := sendDataToStorage(*s.Client, string(procResBytes)); err != nil {
 			log.Printf("Error sending data to storage: %v", err)
+		} else {
+			s.Metric.AddSentDataBytes("central-storage", float64(sentBytes))
 		}
 	}(recData.Payload, s.Metric, st)
 
@@ -209,23 +212,27 @@ func generateAlertStruct(res map[string]any) (*dpapi.AlertRaw, error) {
 }
 
 // sendDataToStorage sends the processed data to the storage service
-func sendDataToStorage(client pb.AirQualityMonitoringClient, data string) error {
+func sendDataToStorage(client pb.AirQualityMonitoringClient, data string) (int, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
 	sentTimestamp := time.Now()
-	ack, err := client.SendDataToServer(ctx, &pb.Data{
+	res := &pb.Data{
 		Payload:       data,
 		SentTimestamp: fmt.Sprintf("%d", int(sentTimestamp.UnixMilli())),
-	})
+	}
+	ack, err := client.SendDataToServer(ctx, res)
 	if err != nil {
-		return fmt.Errorf("send data not successful: %v", err)
+		return 0, fmt.Errorf("send data not successful: %v", err)
 	}
 	if ack.Status != "ok" {
-		return fmt.Errorf("ack status not expected: %s", ack.Status)
+		return 0, fmt.Errorf("ack status not expected: %s", ack.Status)
 	}
-	log.Printf("Sent [%d] bytes. Ack recevied, status: [%s]\n", len(data), ack.Status)
-	return nil
+
+	bytesSent := proto.Size(res)
+	log.Printf("Sent [%d] bytes. Ack recevied, status: [%s]\n", bytesSent, ack.Status)
+
+	return bytesSent, nil
 }
 
 // processTicker processes the ticker event

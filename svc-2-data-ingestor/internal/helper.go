@@ -12,6 +12,7 @@ import (
 	metric "github.com/etesami/air-quality-monitoring/pkg/metric"
 	pb "github.com/etesami/air-quality-monitoring/pkg/protoc"
 	utils "github.com/etesami/air-quality-monitoring/pkg/utils"
+	"google.golang.org/protobuf/proto"
 )
 
 type Server struct {
@@ -74,9 +75,11 @@ func (s Server) SendDataToServer(ctx context.Context, recData *pb.Data) (*pb.Ack
 		pTime = time.Since(st).Milliseconds()
 		s.Metric.AddProcessingTime("processing", float64(pTime)/1000.0)
 
-		if err := sendDataToStorage(*s.Client, preprocessedData); err != nil {
+		if sentBytes, err := sendDataToStorage(*s.Client, preprocessedData); err != nil {
 			log.Printf("Error sending data to storage: %v", err)
 			return
+		} else {
+			s.Metric.AddSentDataBytes("local-storage", float64(sentBytes))
 		}
 
 	}(recData.Payload, st)
@@ -91,29 +94,33 @@ func (s Server) SendDataToServer(ctx context.Context, recData *pb.Data) (*pb.Ack
 	return ack, nil
 }
 
-func sendDataToStorage(client pb.AirQualityMonitoringClient, d *api.AirQualityData) error {
+func sendDataToStorage(client pb.AirQualityMonitoringClient, d *api.AirQualityData) (int, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
 	// Marhal the data to JSON
 	byteData, err := json.Marshal(d)
 	if err != nil {
-		return fmt.Errorf("error marshalling data to JSON: %v", err)
+		return 0, fmt.Errorf("error marshalling data to JSON: %v", err)
 	}
 
 	sentTimestamp := time.Now()
-	ack, err := client.SendDataToServer(ctx, &pb.Data{
+	res := &pb.Data{
 		Payload:       string(byteData),
-		SentTimestamp: strconv.Itoa(int(sentTimestamp.UnixMilli())),
-	})
+		SentTimestamp: fmt.Sprintf("%d", int(sentTimestamp.UnixMilli())),
+	}
+	ack, err := client.SendDataToServer(ctx, res)
 	if err != nil {
-		return fmt.Errorf("send data not successful: %v", err)
+		return 0, fmt.Errorf("send data not successful: %v", err)
 	}
 	if ack.Status != "ok" {
-		return fmt.Errorf("ack status not expected: %s", ack.Status)
+		return 0, fmt.Errorf("ack status not expected: %s", ack.Status)
 	}
-	log.Printf("Sent [%d] bytes. Ack recevied, status: [%s]]\n", len(byteData), ack.Status)
-	return nil
+
+	bytesSent := proto.Size(res)
+	log.Printf("Sent [%d] bytes. Ack recevied, status: [%s]\n", bytesSent, ack.Status)
+
+	return bytesSent, nil
 }
 
 // processTicker processes the ticker event

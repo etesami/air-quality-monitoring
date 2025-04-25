@@ -12,6 +12,7 @@ import (
 	"github.com/etesami/air-quality-monitoring/pkg/metric"
 	pb "github.com/etesami/air-quality-monitoring/pkg/protoc"
 	utils "github.com/etesami/air-quality-monitoring/pkg/utils"
+	"google.golang.org/protobuf/proto"
 
 	localapi "github.com/etesami/air-quality-monitoring/api/local-storage"
 	_ "github.com/mattn/go-sqlite3"
@@ -284,9 +285,12 @@ func ProcessTicker(ctx context.Context, client *pb.AirQualityMonitoringClient, d
 		}
 		metricList.AddProcessingTime("processing", float64(time.Since(st).Milliseconds())/1000.0)
 
+		sentBytes := proto.Size(res)
 		_, err := (*client).SendDataToServer(context.Background(), res)
 		if err != nil {
 			return fmt.Errorf("Error sending data to server: %v", err)
+		} else {
+			metricList.AddSentDataBytes("processor", float64(sentBytes))
 		}
 	}
 

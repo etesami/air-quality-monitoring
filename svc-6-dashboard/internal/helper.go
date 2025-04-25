@@ -9,6 +9,7 @@ import (
 
 	agapi "github.com/etesami/air-quality-monitoring/api/aggregated-storage"
 	loapi "github.com/etesami/air-quality-monitoring/api/local-storage"
+	"google.golang.org/protobuf/proto"
 
 	"github.com/etesami/air-quality-monitoring/pkg/metric"
 	pb "github.com/etesami/air-quality-monitoring/pkg/protoc"
@@ -16,7 +17,7 @@ import (
 )
 
 // requestNewData requests new data from the central storage service
-func requestNewData(client pb.AirQualityMonitoringClient) (string, error) {
+func requestNewData(client pb.AirQualityMonitoringClient) (string, int, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
@@ -25,7 +26,7 @@ func requestNewData(client pb.AirQualityMonitoringClient) (string, error) {
 	}
 	reqByte, err := json.Marshal(reqBody)
 	if err != nil {
-		return "", fmt.Errorf("error marshalling JSON: %v", err)
+		return "", 0, fmt.Errorf("error marshalling JSON: %v", err)
 	}
 
 	sentTimestamp := time.Now()
@@ -34,15 +35,16 @@ func requestNewData(client pb.AirQualityMonitoringClient) (string, error) {
 		SentTimestamp: fmt.Sprintf("%d", int(sentTimestamp.UnixMilli())),
 	})
 	if err != nil {
-		return "", fmt.Errorf("error requesting data from local storage: %v", err)
+		return "", 0, fmt.Errorf("error requesting data from local storage: %v", err)
 	}
 	if len(res.Payload) == 0 {
 		log.Printf("No data received from local storage.\n")
-		return "", nil
+		return "", 0, nil
 	}
 	log.Printf("Response from storage recevied, len: [%d]\n", len(res.Payload))
 
-	return res.Payload, nil
+	bytesRec := proto.Size(res)
+	return res.Payload, bytesRec, nil
 }
 
 // processTicker processes the ticker event
@@ -71,11 +73,11 @@ func ProcessTicker(client *pb.AirQualityMonitoringClient, serverName string, m *
 		log.Printf("RTT to [%s] service: [%.2f] ms\n", serverName, float64(rtt)/1000.0)
 	}(m)
 
-	recData, err := requestNewData(*client)
+	recData, recBytes, err := requestNewData(*client)
 	if err != nil {
 		return fmt.Errorf("error requesting new data: %v", err)
 	}
-	if len(recData) == 0 {
+	if len(recData) == 0 || recBytes == 0 {
 		return fmt.Errorf("no data received from local storage service")
 	}
 
@@ -85,6 +87,7 @@ func ProcessTicker(client *pb.AirQualityMonitoringClient, serverName string, m *
 		return fmt.Errorf("error unmarshalling JSON: %v", err)
 	}
 	m.AddProcessingTime("processing", time.Since(sProcssTime).Seconds())
+	m.AddSentDataBytes("central-storage", float64(recBytes))
 	log.Printf("Received [%d] items.", len(dataRes))
 	return nil
 
